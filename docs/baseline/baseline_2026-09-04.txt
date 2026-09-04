@@ -1,0 +1,48 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Bota\AppData\Local\Programs\Python\Python311\python.exe
+cachedir: .pytest_cache
+PySide6 6.11.1 -- Qt runtime 6.11.1 -- Qt compiled 6.11.1
+rootdir: G:\Projekti\Finalna Aplikacija
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0, qt-4.5.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 36 items
+
+tests/test_baseline_smoke.py::TestCoreServices::test_event_bus_pubsub PASSED [  2%]
+tests/test_baseline_smoke.py::TestCoreServices::test_event_bus_unsubscribe PASSED [  5%]
+tests/test_baseline_smoke.py::TestCoreServices::test_config_manager_reads_defaults PASSED [  8%]
+tests/test_baseline_smoke.py::TestCoreServices::test_config_manager_roundtrip PASSED [ 11%]
+tests/test_baseline_smoke.py::TestModelSystem::test_discovery_finds_project_models PASSED [ 13%]
+tests/test_baseline_smoke.py::TestModelSystem::test_discovered_model_capabilities PASSED [ 16%]
+tests/test_baseline_smoke.py::TestModelSystem::test_discovery_all_sources_no_crash PASSED [ 19%]
+tests/test_baseline_smoke.py::TestModelSystem::test_model_manager_test_mode_stub PASSED [ 22%]
+tests/test_baseline_smoke.py::TestModelSystem::test_model_manager_rescan_lists_models PASSED [ 25%]
+tests/test_baseline_smoke.py::TestModelSystem::test_stub_engine_generate PASSED [ 27%]
+tests/test_baseline_smoke.py::TestModelSystem::test_gguf_metadata_reader_on_project_model PASSED [ 30%]
+tests/test_baseline_smoke.py::TestMemorySystem::test_short_term_memory_window PASSED [ 33%]
+tests/test_baseline_smoke.py::TestMemorySystem::test_short_term_memory_roles PASSED [ 36%]
+tests/test_baseline_smoke.py::TestMemorySystem::test_long_term_memory_roundtrip PASSED [ 38%]
+tests/test_baseline_smoke.py::TestMemorySystem::test_vector_memory_stub_knn PASSED [ 41%]
+tests/test_baseline_smoke.py::TestKnowledgeSystem::test_document_loader_txt PASSED [ 44%]
+tests/test_baseline_smoke.py::TestKnowledgeSystem::test_rag_pipeline_index_and_retrieve PASSED [ 47%]
+tests/test_baseline_smoke.py::TestToolsAndSecurity::test_tool_registry_workflow PASSED [ 50%]
+tests/test_baseline_smoke.py::TestToolsAndSecurity::test_tool_execution_flow PASSED [ 52%]
+tests/test_baseline_smoke.py::TestToolsAndSecurity::test_tool_discovery_service PASSED [ 55%]
+tests/test_baseline_smoke.py::TestToolsAndSecurity::test_security_permission_flow PASSED [ 58%]
+tests/test_baseline_smoke.py::TestToolsAndSecurity::test_path_validation_blocks_traversal PASSED [ 61%]
+tests/test_baseline_smoke.py::TestAgentSystem::test_stub_planner_produces_plan PASSED [ 63%]
+tests/test_baseline_smoke.py::TestAgentSystem::test_agent_repository_roundtrip PASSED [ 66%]
+tests/test_baseline_smoke.py::TestDatabase::test_database_manager_tables PASSED [ 69%]
+tests/test_baseline_smoke.py::TestUiShell::test_app_shell_creation_and_navigation PASSED [ 72%]
+tests/test_baseline_smoke.py::TestUiShell::test_home_page_creates PASSED [ 75%]
+tests/test_final_app.py::TestStandaloneImports::test_app_shell_import PASSED [ 77%]
+tests/test_final_app.py::TestStandaloneImports::test_home_page_import PASSED [ 80%]
+tests/test_final_app.py::TestStandaloneImports::test_application_final_import PASSED [ 83%]
+tests/test_final_app.py::TestAppShell::test_shell_creates_with_defaults PASSED [ 86%]
+tests/test_final_app.py::TestAppShell::test_shell_default_route PASSED   [ 88%]
+tests/test_final_app.py::TestAppShell::test_shell_navigate_changes_page PASSED [ 91%]
+tests/test_final_app.py::TestAppShell::test_shell_navigate_unknown_route PASSED [ 94%]
+tests/test_final_app.py::TestHomePage::test_home_page_creates PASSED     [ 97%]
+tests/test_final_app.py::TestHomePage::test_home_page_has_cards PASSED   [100%]
+
+============================= 36 passed in 5.64s ==============================
