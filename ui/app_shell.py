@@ -45,6 +45,7 @@ class AppShell(QMainWindow):
         model_name: str = "No model loaded",
         capabilities: list[str] | None = None,
         memory_count: int = 0,
+        event_bus=None,
     ) -> None:
         super().__init__()
         self._theme = theme
@@ -59,6 +60,8 @@ class AppShell(QMainWindow):
         self._model_name = model_name
         self._capabilities = capabilities or []
         self._memory_count = memory_count
+        self._event_bus = event_bus
+        self._event_sub_ids: list[tuple[str, str]] = []
 
         self.setWindowTitle("Offline AI Assistant")
         self.resize(1500, 900)
@@ -67,6 +70,7 @@ class AppShell(QMainWindow):
         self._build_ui()
         # Označi aktivnu stranicu (default route) u navigaciji
         self._mark_active_nav(self._default_route)
+        self._subscribe_events()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -345,10 +349,16 @@ class AppShell(QMainWindow):
         return "No model loaded"
 
     def _on_new_conversation(self) -> None:
-        # TODO (faza 3.4): povezati na EventBus NEW_CHAT_REQUESTED event
-        # (Assistant cisti ShortTermMemory). Za sada direktan poziv ako
-        # asistent postoji, inace samo navigacija na Chat.
-        if self._assistant is not None and hasattr(self._assistant, "_memory"):
+        # NEW_CHAT_REQUESTED ide kroz EventBus (ApplicationManager cisti
+        # ShortTermMemory na isti event) — fallback direktan poziv na memoriju.
+        published = False
+        if self._event_bus is not None:
+            try:
+                self._event_bus.publish("NEW_CHAT_REQUESTED", data={})
+                published = True
+            except Exception:
+                published = False
+        if not published and self._assistant is not None:
             memory = getattr(self._assistant, "_memory", None)
             if memory is not None and hasattr(memory, "start_conversation"):
                 try:
@@ -356,3 +366,58 @@ class AppShell(QMainWindow):
                 except Exception:
                     pass
         self._navigate("Chat")
+
+    # ------------------------------------------------------------------
+    # EventBus integracija (3.4)
+    # ------------------------------------------------------------------
+
+    def _subscribe_events(self) -> None:
+        if self._event_bus is None:
+            return
+        handlers = [
+            ("MODEL_LOADED", self._on_event_model_loaded),
+            ("MODEL_UNLOADED", self._on_event_model_unloaded),
+            ("MODEL_LOAD_FAILED", self._on_event_model_load_failed),
+            ("MEMORY_UPDATED", self._on_event_memory_updated),
+            ("PROFILE_UPDATED", self._on_event_profile_updated),
+        ]
+        for event_type, handler in handlers:
+            try:
+                sub_id = self._event_bus.subscribe(event_type, handler)
+                self._event_sub_ids.append((event_type, sub_id))
+            except Exception:
+                pass
+
+    def _unsubscribe_events(self) -> None:
+        if self._event_bus is None:
+            return
+        for event_type, sub_id in self._event_sub_ids:
+            try:
+                self._event_bus.unsubscribe(event_type, sub_id)
+            except Exception:
+                pass
+        self._event_sub_ids.clear()
+
+    def _on_event_model_loaded(self, event_type: str, data: dict) -> None:
+        model = (data or {}).get("model") or "Model"
+        self.update_model_status(model)
+
+    def _on_event_model_unloaded(self, event_type: str, data: dict) -> None:
+        self.update_model_status(None)
+
+    def _on_event_model_load_failed(self, event_type: str, data: dict) -> None:
+        self.update_model_status(None)
+
+    def _on_event_memory_updated(self, event_type: str, data: dict) -> None:
+        count = (data or {}).get("count")
+        if isinstance(count, int):
+            self.update_memory_count(count)
+
+    def _on_event_profile_updated(self, event_type: str, data: dict) -> None:
+        name = (data or {}).get("identity.name")
+        if isinstance(name, str) and name:
+            self.set_assistant_name(name)
+
+    def closeEvent(self, event) -> None:  # noqa: N802 — Qt override
+        self._unsubscribe_events()
+        super().closeEvent(event)

@@ -132,6 +132,7 @@ def main() -> int:
         model_name=model_name,
         capabilities=capabilities,
         memory_count=memory_count,
+        event_bus=manager._event_bus,
     )
     shell_holder["shell"] = shell
     shell.show()

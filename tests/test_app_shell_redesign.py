@@ -107,3 +107,62 @@ class TestShellStyle:
         """AppShell NE sme imati lokalni QSS — stilovi dolaze iz ThemeManager-a."""
         shell = _make_shell()
         assert shell.styleSheet() == ""
+
+
+class TestEventBusIntegration:
+    def test_shell_subscribes_to_model_events(self, qapp):
+        from core.event_bus import EventBus
+
+        bus = EventBus()
+        shell = _make_shell()
+        shell._event_bus = bus
+        shell._subscribe_events()
+        assert len(shell._event_sub_ids) == 5
+
+        bus.publish("MODEL_LOADED", data={"model": "Qwen2.5-Coder-7B"})
+        assert "Qwen2.5-Coder-7B" in shell._context_model_label.text()
+
+        bus.publish("MODEL_UNLOADED", data={})
+        assert "No model loaded" in shell._context_model_label.text()
+        shell._unsubscribe_events()
+
+    def test_shell_subscribes_to_memory_events(self, qapp):
+        from core.event_bus import EventBus
+
+        bus = EventBus()
+        shell = _make_shell()
+        shell._event_bus = bus
+        shell._subscribe_events()
+
+        bus.publish("MEMORY_UPDATED", data={"count": 17})
+        assert "17" in shell._context_memory_label.text()
+        shell._unsubscribe_events()
+
+    def test_unsubscribe_stops_delivery(self, qapp):
+        from core.event_bus import EventBus
+
+        bus = EventBus()
+        shell = _make_shell()
+        shell._event_bus = bus
+        shell._subscribe_events()
+        shell._unsubscribe_events()
+
+        bus.publish("MODEL_LOADED", data={"model": "test-model"})
+        assert "test-model" not in shell._context_model_label.text()
+
+    def test_new_conversation_publishes_event(self, qapp):
+        from core.event_bus import EventBus
+
+        bus = EventBus()
+        received: list[tuple[str, object]] = []
+
+        def handler(event_type, data):
+            received.append((event_type, data))
+
+        bus.subscribe("NEW_CHAT_REQUESTED", handler)
+
+        shell = _make_shell()
+        shell._event_bus = bus
+        shell._on_new_conversation()
+        assert received == [("NEW_CHAT_REQUESTED", {})]
+        assert shell._pages_widget.currentWidget() is shell._page_map["Chat"]
