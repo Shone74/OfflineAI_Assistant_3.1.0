@@ -1,4 +1,16 @@
-"""Reference-based application shell for the final standalone build."""
+"""Reference-based application shell for the final standalone build.
+
+Redizajn prema zvaničnom workspace dizajnu (Izgled Aplikaccije/
+assistant_workspace_preview.py + docs/design_system.md):
+
+- Topbar: ☰ (toggle sidebar) · ime asistenta · "● Local" · Context (toggle) · ⚙
+- Sidebar: ime asistenta, "+ New Conversation", navigacija sa selected
+  stanjem, "👤 My Profile" + "⚙ Settings" na dnu
+- Stranice: QStackedWidget
+- Context panel: Assistant / AI Model / Capabilities / Memory + 🔒 footer
+
+Stilovi se NE primenjuju lokalno — dolaze iz ThemeManager-a (ui/design).
+"""
 
 from __future__ import annotations
 
@@ -9,10 +21,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QStackedWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -21,7 +33,7 @@ from ui.theme_manager import ThemeManager
 
 
 class AppShell(QMainWindow):
-    """Main application shell matching the reference visual direction."""
+    """Main application shell matching the official workspace design."""
 
     def __init__(
         self,
@@ -42,63 +54,128 @@ class AppShell(QMainWindow):
         self._sidebar_visible = True
         self._context_visible = True
         self._page_map: dict[str, QWidget] = {}
+        self._nav_buttons: dict[str, QPushButton] = {}
         self._assistant = assistant
         self._model_name = model_name
         self._capabilities = capabilities or []
         self._memory_count = memory_count
 
         self.setWindowTitle("Offline AI Assistant")
-        self.resize(1200, 800)
+        self.resize(1500, 900)
+        self.setObjectName("shell")
 
         self._build_ui()
-        self._apply_shell_style()
+        # Označi aktivnu stranicu (default route) u navigaciji
+        self._mark_active_nav(self._default_route)
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         central = QWidget()
+        central.setObjectName("page_root")
         self.setCentralWidget(central)
 
-        root = QHBoxLayout(central)
+        root = QVBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        splitter = QSplitter(Qt.Horizontal)
+        root.addWidget(self._build_topbar())
 
-        sidebar = self._build_sidebar()
-        splitter.addWidget(sidebar)
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        root.addLayout(body)
 
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Stranice prve — _build_sidebar cita self._pages za ADVANCED sekciju
         self._pages_widget = QStackedWidget()
         for name, page in self._pages:
             self._page_map[name] = page
             self._pages_widget.addWidget(page)
-        splitter.addWidget(self._pages_widget)
+        self._splitter.addWidget(self._pages_widget)
 
-        context = self._build_context_panel()
-        splitter.addWidget(context)
+        self._sidebar = self._build_sidebar()
+        self._splitter.insertWidget(0, self._sidebar)
 
-        splitter.setSizes([240, 900, 280])
-        root.addWidget(splitter)
+        self._context_panel = self._build_context_panel()
+        self._splitter.addWidget(self._context_panel)
+
+        self._splitter.setSizes([240, 980, 280])
+        self._splitter.setCollapsible(0, False)
+        self._splitter.setCollapsible(2, False)
+        body.addWidget(self._splitter)
 
         target = self._page_map.get(self._default_route)
         if target is not None:
             self._pages_widget.setCurrentWidget(target)
 
+    def _build_topbar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("topbar")
+        bar.setFixedHeight(52)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(8)
+
+        self._menu_button = QPushButton("☰")
+        self._menu_button.setObjectName("topbar_button")
+        self._menu_button.setToolTip("Prikaži/sakrij navigaciju")
+        self._menu_button.clicked.connect(self.toggle_sidebar)
+        layout.addWidget(self._menu_button)
+
+        self._topbar_title = QLabel(self._assistant_name)
+        self._topbar_title.setObjectName("topbar_title")
+        layout.addWidget(self._topbar_title)
+
+        layout.addStretch()
+
+        local_status = QLabel("● Local")
+        local_status.setObjectName("status_local")
+        layout.addWidget(local_status)
+
+        self._context_button = QPushButton("Context")
+        self._context_button.setObjectName("topbar_button")
+        self._context_button.setToolTip("Prikaži/sakrij context panel")
+        self._context_button.clicked.connect(self.toggle_context_panel)
+        layout.addWidget(self._context_button)
+
+        self._settings_button = QPushButton("⚙")
+        self._settings_button.setObjectName("topbar_button")
+        self._settings_button.setToolTip("Settings")
+        self._settings_button.clicked.connect(lambda: self._navigate("Settings"))
+        layout.addWidget(self._settings_button)
+
+        return bar
+
     def _build_sidebar(self) -> QWidget:
         container = QFrame()
         container.setObjectName("sidebar")
+        container.setMinimumWidth(200)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 18, 12, 12)
-        layout.setSpacing(8)
+        layout.setSpacing(6)
 
-        brand = QLabel(self._assistant_name)
-        brand.setObjectName("assistant_name")
-        brand.setStyleSheet("font-size: 12pt; font-weight: 600;")
-        layout.addWidget(brand)
+        name = QLabel(self._assistant_name)
+        name.setObjectName("sidebar_assistant_name")
+        name.setWordWrap(True)
+        layout.addWidget(name)
 
-        subtitle = QLabel("Personal workspace")
-        subtitle.setStyleSheet("color: #A8AFB5;")
+        subtitle = QLabel("Your Personal Assistant")
+        subtitle.setObjectName("sidebar_subtitle")
         layout.addWidget(subtitle)
 
-        layout.addSpacing(18)
+        layout.addSpacing(14)
+
+        new_chat = QPushButton("＋  New Conversation")
+        new_chat.setObjectName("new_conversation")
+        new_chat.setCursor(Qt.CursorShape.PointingHandCursor)
+        new_chat.clicked.connect(self._on_new_conversation)
+        layout.addWidget(new_chat)
+
+        layout.addSpacing(10)
 
         nav_items = [
             ("Home", "🏠"),
@@ -106,79 +183,176 @@ class AppShell(QMainWindow):
             ("Memory", "🧠"),
             ("Knowledge", "📚"),
             ("Capabilities", "🧩"),
-            ("Projects", "📁"),
-            ("Settings", "⚙"),
+            ("Projects", "🗂"),
         ]
 
-        for name, icon in nav_items:
-            btn = QToolButton()
+        for route, icon in nav_items:
+            btn = QPushButton(f"{icon}  {route}")
             btn.setObjectName("nav_button")
-            btn.setText(f"{icon}  {name}")
-            btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _, n=name: self._navigate(n))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda _, r=route: self._navigate(r))
+            self._nav_buttons[route] = btn
             layout.addWidget(btn)
 
+        # Stranice van primarne navigacije (iz final bootstrap-a):
+        # Agents, Tools, Voice, Automation, Workflow, Models → "Advanced"
+        advanced_routes = [
+            ("Models", "📦"),
+            ("Agents", "🤖"),
+            ("Tools", "🔧"),
+            ("Voice", "🎤"),
+            ("Automation", "⚡"),
+            ("Workflow", "🧪"),
+        ]
+        has_advanced = any(r in self._page_map for r, _ in advanced_routes)
+        if has_advanced:
+            section = QLabel("ADVANCED")
+            section.setObjectName("sidebar_section")
+            layout.addSpacing(8)
+            layout.addWidget(section)
+            for route, icon in advanced_routes:
+                if route in self._page_map:
+                    btn = QPushButton(f"{icon}  {route}")
+                    btn.setObjectName("nav_button")
+                    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                    btn.setCheckable(True)
+                    btn.clicked.connect(lambda _, r=route: self._navigate(r))
+                    self._nav_buttons[route] = btn
+                    layout.addWidget(btn)
+
         layout.addStretch()
+
+        profile = QPushButton("👤  My Profile")
+        profile.setObjectName("nav_button")
+        profile.setCursor(Qt.CursorShape.PointingHandCursor)
+        profile.clicked.connect(lambda: self._navigate("Settings"))
+        layout.addWidget(profile)
+
+        settings = QPushButton("⚙  Settings")
+        settings.setObjectName("nav_button")
+        settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        settings.clicked.connect(lambda: self._navigate("Settings"))
+        layout.addWidget(settings)
+
         return container
 
     def _build_context_panel(self) -> QWidget:
         panel = QFrame()
         panel.setObjectName("context_panel")
+        panel.setMinimumWidth(220)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(18, 22, 18, 18)
-        layout.setSpacing(12)
+        layout.setSpacing(6)
 
-        layout.addWidget(QLabel("Context"))
+        def section_title(text: str) -> QLabel:
+            label = QLabel(text.upper())
+            label.setObjectName("context_section_title")
+            return label
 
-        assistant = QLabel(f"{self._assistant_name}\nBalanced · Serbian")
-        assistant.setStyleSheet("color: #A8AFB5;")
-        layout.addWidget(assistant)
+        def value(text: str) -> QLabel:
+            label = QLabel(text)
+            label.setObjectName("context_value")
+            label.setWordWrap(True)
+            return label
 
-        model_text = self._model_name or "No model loaded"
-        model = QLabel(f"{model_text}\n● Ready · GPU" if self._model_name else "No model loaded")
-        model.setStyleSheet("color: #A8AFB5;")
-        layout.addWidget(model)
+        # Assistant
+        layout.addWidget(section_title("Assistant"))
+        layout.addWidget(value(f"{self._assistant_name}\nBalanced · Serbian"))
 
-        cap_text = "\n".join(f"✓ {c}" for c in self._capabilities) if self._capabilities else "No capabilities available"
-        capabilities = QLabel(cap_text)
-        capabilities.setStyleSheet("color: #A8AFB5;")
-        layout.addWidget(capabilities)
+        layout.addSpacing(10)
 
-        memory = QLabel(f"{self._memory_count} recent messages")
-        memory.setStyleSheet("color: #A8AFB5;")
-        layout.addWidget(memory)
+        # AI Model
+        layout.addWidget(section_title("AI Model"))
+        self._context_model_label = value(self._format_model_text())
+        layout.addWidget(self._context_model_label)
+
+        layout.addSpacing(10)
+
+        # Capabilities
+        layout.addWidget(section_title("Capabilities"))
+        cap_text = (
+            "\n".join(f"✓ {c}" for c in self._capabilities[:6])
+            if self._capabilities
+            else "No capabilities available"
+        )
+        self._context_caps_label = value(cap_text)
+        layout.addWidget(self._context_caps_label)
+
+        layout.addSpacing(10)
+
+        # Memory
+        layout.addWidget(section_title("Memory"))
+        self._context_memory_label = value(f"{self._memory_count} recent messages")
+        layout.addWidget(self._context_memory_label)
 
         layout.addStretch()
 
         privacy = QLabel("🔒 Local AI\nYour data stays on this device.")
-        privacy.setStyleSheet("color: #27C48A;")
+        privacy.setObjectName("context_privacy")
+        privacy.setWordWrap(True)
         layout.addWidget(privacy)
 
         return panel
+
+    # ------------------------------------------------------------------
+    # Navigation
+    # ------------------------------------------------------------------
 
     def _navigate(self, name: str) -> None:
         target = self._page_map.get(name)
         if target is not None:
             self._pages_widget.setCurrentWidget(target)
+            self._mark_active_nav(name)
 
-    def _apply_shell_style(self) -> None:
-        self.setStyleSheet(
-            """
-            QMainWindow { background-color: #202326; color: #F1F3F4; }
-            QFrame#sidebar { background-color: #181A1D; border-right: 1px solid #373C41; }
-            QFrame#context_panel { background-color: #181A1D; border-left: 1px solid #373C41; }
-            QToolButton#nav_button { background-color: transparent; border: none; border-radius: 6px; padding: 10px 12px; text-align: left; }
-            QToolButton#nav_button:hover { background-color: #292D31; }
-            QPushButton { background-color: #292D31; border: 1px solid #373C41; border-radius: 7px; padding: 8px 14px; }
-            QPushButton:hover { border-color: #27C48A; }
-            QPushButton#primary_button { background-color: #27C48A; color: #101513; border: none; font-weight: 600; }
-            QPushButton#primary_button:hover { background-color: #1E9D70; }
-            QLabel { font-family: "Segoe UI", Arial, sans-serif; font-size: 10pt; }
-            QLabel#assistant_name { font-size: 12pt; font-weight: 600; }
-            QTextEdit, QLineEdit, QComboBox { background-color: #292D31; border: 1px solid #373C41; border-radius: 7px; padding: 8px; }
-            QTextEdit:focus, QLineEdit:focus, QComboBox:focus { border-color: #27C48A; }
-            QSplitter::handle { background-color: #373C41; }
-            QScrollArea { border: none; background-color: transparent; }
-            """
-        )
+    def _mark_active_nav(self, route: str) -> None:
+        for name, btn in self._nav_buttons.items():
+            btn.setChecked(name == route)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def toggle_sidebar(self) -> None:
+        self._sidebar_visible = not self._sidebar_visible
+        self._sidebar.setVisible(self._sidebar_visible)
+
+    def toggle_context_panel(self) -> None:
+        self._context_visible = not self._context_visible
+        self._context_panel.setVisible(self._context_visible)
+
+    def set_assistant_name(self, name: str) -> None:
+        self._assistant_name = name
+        self._topbar_title.setText(name)
+
+    def update_model_status(self, model_name: str | None) -> None:
+        self._model_name = model_name or "No model loaded"
+        if hasattr(self, "_context_model_label"):
+            self._context_model_label.setText(self._format_model_text())
+
+    def update_memory_count(self, count: int) -> None:
+        self._memory_count = count
+        if hasattr(self, "_context_memory_label"):
+            self._context_memory_label.setText(f"{count} recent messages")
+
+    # ------------------------------------------------------------------
+    # Interni helperi
+    # ------------------------------------------------------------------
+
+    def _format_model_text(self) -> str:
+        if self._model_name and self._model_name != "No model loaded":
+            return f"{self._model_name}\n● Ready · Local"
+        return "No model loaded"
+
+    def _on_new_conversation(self) -> None:
+        # TODO (faza 3.4): povezati na EventBus NEW_CHAT_REQUESTED event
+        # (Assistant cisti ShortTermMemory). Za sada direktan poziv ako
+        # asistent postoji, inace samo navigacija na Chat.
+        if self._assistant is not None and hasattr(self._assistant, "_memory"):
+            memory = getattr(self._assistant, "_memory", None)
+            if memory is not None and hasattr(memory, "start_conversation"):
+                try:
+                    memory.start_conversation()
+                except Exception:
+                    pass
+        self._navigate("Chat")
