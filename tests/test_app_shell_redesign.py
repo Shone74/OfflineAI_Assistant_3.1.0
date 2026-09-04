@@ -219,3 +219,30 @@ class TestHomePageRedesign:
         assert "No model" in page._hero._status_label.text()
         page._hero.set_status(True)
         assert "Ready" in page._hero._status_label.text()
+
+
+class TestSettingsPage:
+    def _make_settings(self, config=None):
+        from ui.settings_page import SettingsPage
+
+        return SettingsPage(config=config)
+
+    def test_settings_page_creates(self, qapp):
+        page = self._make_settings()
+        assert page._theme_combo is not None
+        assert page._advanced_btn.objectName() == "primary_button"
+
+    def test_settings_theme_persists(self, qapp, tmp_path):
+        from core.config_manager import ConfigManager
+
+        config = ConfigManager(settings_path=tmp_path / "settings.json")
+        page = self._make_settings(config=config)
+        page._on_theme_changed("installer")
+        assert config.get("ui.theme") == "installer"
+
+    def test_settings_in_shell_navigation(self, qapp):
+        pages = [("Home", QWidget()), ("Settings", self._make_settings())]
+        shell = _make_shell(pages)
+        shell._navigate("Settings")
+        assert shell._pages_widget.currentWidget() is pages[1][1]
+        assert shell._nav_buttons["Settings"].isChecked() is True

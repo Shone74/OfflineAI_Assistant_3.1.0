@@ -25,7 +25,7 @@ from ui.tools_page import ToolsPage
 from ui.voice_page import VoicePage
 from ui.automation_dashboard import AutomationDashboard
 from ui.workflow_builder import WorkflowBuilder
-from ui.settings import SettingsDialog
+from ui.settings_page import SettingsPage
 
 
 def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWidget]]:
@@ -49,7 +49,7 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
     voice_page = VoicePage(config=config, event_bus=event_bus, voice_manager=voice)
     automation = AutomationDashboard(navigator=navigator)
     workflow = WorkflowBuilder(automation_manager=automation_manager, navigator=navigator)
-    settings_dialog = SettingsDialog(
+    settings_page = SettingsPage(
         config=config,
         event_bus=event_bus,
         assistant=assistant,
@@ -70,6 +70,7 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
         ("Voice", voice_page),
         ("Automation", automation),
         ("Workflow", workflow),
+        ("Settings", settings_page),
     ]
     return pages
 

@@ -236,7 +236,9 @@ class AppShell(QMainWindow):
         settings = QPushButton("⚙  Settings")
         settings.setObjectName("nav_button")
         settings.setCursor(Qt.CursorShape.PointingHandCursor)
-        settings.clicked.connect(lambda: self._navigate("Settings"))
+        settings.setCheckable(True)
+        settings.clicked.connect(lambda _, r="Settings": self._navigate(r))
+        self._nav_buttons["Settings"] = settings
         layout.addWidget(settings)
 
         return container
