@@ -280,7 +280,7 @@ class Assistant:
             prompt_tokens = self._engine.count_tokens(messages)
             if not isinstance(prompt_tokens, int):
                 prompt_tokens = sum(len(m.get("content", "")) for m in messages) // 4
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Token counting failed, using fallback: %s", exc)
             prompt_tokens = sum(len(m.get("content", "")) for m in messages) // 4
 
@@ -562,7 +562,7 @@ class Assistant:
             engine._model_name_override = agent_def.model_name
             logger.info("Agent '%s' resolved to model '%s'", agent_def.name, agent_def.model_name)
             return engine
-        except Exception as exc:  # noqa: BLE001 — graceful fallback
+        except Exception as exc:
             logger.warning(
                 "Agent '%s' model '%s' unavailable: %s — using global engine",
                 agent_def.name, agent_def.model_name, exc,
@@ -1416,7 +1416,7 @@ class Assistant:
                 "response_length": len(response),
             })
             return response
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             session.fail(str(exc))
             pub("GENERATION_FAILED", data={"error": str(exc)})
             logger.error("Generation failed: %s", exc)
@@ -1781,7 +1781,7 @@ class Assistant:
                 _MAX_TOOL_CALL_ITERATIONS,
             )
             return final
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             session.fail(str(exc))
             pub(
                 "GENERATION_FAILED", data={"error": str(exc)}

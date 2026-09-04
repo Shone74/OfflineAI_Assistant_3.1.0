@@ -45,7 +45,7 @@ def _cuda_available() -> bool:
 
         cuda = getattr(ctranslate2, "cuda", None)
         return cuda is not None and cuda.is_available()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -217,6 +217,6 @@ def create_stt(
                 language=language,
                 stt_dir=stt_dir,
             )
-        except Exception:  # noqa: BLE001 — backend unusable, fall back to stub
+        except Exception:
             logger.info("WhisperSTT init failed, using stub STT")
     return StubSTT()

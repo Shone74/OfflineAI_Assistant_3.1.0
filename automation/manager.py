@@ -307,7 +307,7 @@ class AutomationManager:
 
                 self._workflows[workflow.name] = workflow
                 loaded += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning(
                     "Failed to load workflow '%s': %s", wf_name, e
                 )

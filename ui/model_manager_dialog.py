@@ -52,7 +52,7 @@ class DownloadWorker(QThread):
             model = self._manager.download_model(self._url, self._filename, self._expected_checksum)
             self.progress.emit(100, "Download complete")
             self.finished.emit(True, str(model.path), "")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Download failed: %s", exc)
             self.finished.emit(False, "", str(exc))
 
@@ -184,7 +184,7 @@ class ModelManagerDialog(QDialog):
                 f"VRAM: {profile.gpu_vram_gb or 'N/A'} GB | "
                 f"CPU: {profile.cpu_cores} cores"
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Hardware detection failed: %s", exc)
             self._rec_label.setText("Hardware detection unavailable")
 

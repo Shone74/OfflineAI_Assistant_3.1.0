@@ -90,7 +90,7 @@ class _VoiceTranscribeWorker(QThread):
             return
         try:
             text = self._stt.transcribe(self._audio, sample_rate=self._sample_rate)
-        except Exception as exc:  # noqa: BLE001 — surface any STT failure to the main thread
+        except Exception as exc:
             self.error.emit(str(exc))
             return
         if self.isInterruptionRequested():
@@ -124,7 +124,7 @@ class _VoiceSpeakWorker(QThread):
             return
         try:
             self._tts.speak(self._text)
-        except Exception as exc:  # noqa: BLE001 — surface any TTS failure to the main thread
+        except Exception as exc:
             self.error.emit(str(exc))
             return
         if self.isInterruptionRequested():
@@ -320,7 +320,7 @@ class VoiceManager:
         if was_recording:
             try:
                 self._audio.stop_recording()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("reconfigure_audio: stop_recording failed: %s", exc)
             self._state = VoiceState.IDLE
             self._event_bus.publish("VOICE_INPUT_END")
@@ -335,7 +335,7 @@ class VoiceManager:
                 "Audio reconfigured from settings (audio=%s)", self.audio_name
             )
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Audio reconfiguration failed: %s", exc)
             # Roll back to the old audio manager.
             self._audio = old_audio
@@ -459,7 +459,7 @@ class VoiceManager:
                 },
             )
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("STT reconfiguration failed: %s", exc)
             # Rollback: restore the previous working provider.
             self._stt = old_stt
@@ -572,7 +572,7 @@ class VoiceManager:
                 },
             )
             return True
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("TTS reconfiguration failed: %s", exc)
             self._tts = old_tts
             self._event_bus.publish(
@@ -724,7 +724,7 @@ class VoiceManager:
             self._publish_voice_error(str(exc))
             self._restart_wake_word_if_enabled()
             return False
-        except Exception as exc:  # noqa: BLE001 — never let capture crashes escape
+        except Exception as exc:
             self._publish_voice_error(f"failed to start recording: {exc}")
             self._restart_wake_word_if_enabled()
             return False
@@ -750,7 +750,7 @@ class VoiceManager:
         except AudioCaptureError as exc:
             self._publish_voice_error(f"failed to stop recording: {exc}")
             return False
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._publish_voice_error(f"failed to stop recording: {exc}")
             return False
         try:
@@ -941,7 +941,7 @@ class VoiceManager:
         try:
             self._wake.start(self._on_wake_word_detected)
             logger.info("Wake-word detection started (%s)", self._wake.name)
-        except Exception as exc:  # noqa: BLE001 — fail safely, never block startup
+        except Exception as exc:
             logger.warning("Wake-word start failed: %s", exc)
 
     def _on_wake_word_detected(self) -> None:

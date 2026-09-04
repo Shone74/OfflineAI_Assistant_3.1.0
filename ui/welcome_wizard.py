@@ -347,7 +347,7 @@ class HardwareScanPage(QWizardPage):
             self._profile = profile
             self._recommendation = rec
             self._on_scan_complete(profile, rec)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Hardware scan failed: %s", exc)
             self._status_label.setText(
                 f"<b>Greška pri skeniranju hardvera:</b><br>{exc}<br><br>"
@@ -799,7 +799,7 @@ class LocationsPage(QWizardPage):
             self._storage_bar_fill.setStyleSheet(
                 f"background: {_EMERALD}; border-radius: 5px; width: {bar_width}%;"
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Could not query disk space: %s", exc)
 
         wizard = self.wizard()
@@ -1316,7 +1316,6 @@ class InstallationPage(QWizardPage):
         except Exception:
             notes.append("AI runtime provera preskočena")
         try:
-            from database.database_manager import DatabaseManager
 
             notes.append("SQLite OK")
         except Exception:
@@ -1409,7 +1408,7 @@ class InstallationPage(QWizardPage):
         action = real_actions[phase_idx]
         try:
             result = action()
-        except Exception as exc:  # noqa: BLE001 — instalacija ne sme pasti
+        except Exception as exc:
             result = f"preskočeno: {exc}"
 
         # Akcija se izvršava jednom po fazi — beležimo rezultat

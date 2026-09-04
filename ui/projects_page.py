@@ -131,7 +131,7 @@ class ProjectsPage(QWidget):
             return
         try:
             self._projects = self._project_mgr.list_projects()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Could not list projects: %s", exc)
             self._projects = []
 
@@ -452,7 +452,7 @@ class ProjectsPage(QWidget):
             return []
         try:
             return self._project_mgr.list_project_files(proj.id, include_hidden=False)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Could not list project files: %s", exc)
             return []
 
@@ -723,7 +723,7 @@ class ProjectsPage(QWidget):
         try:
             agents = self._agent_repo.list_agents(include_disabled=False)
             return [a.name for a in agents if a.enabled]
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
 
     def _show_status(self, message: str) -> None:

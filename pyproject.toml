@@ -44,6 +44,11 @@ offline-ai-final = "app.application_final:main"
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+# Legacy codebase koristi namerne "except Exception: pass" graceful-degradation
+# obrasce (stub-first dizajn) — BLE001/S110 su dozvoljeni namerno.
+ignore = ["BLE001", "S110", "S112"]
+
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true

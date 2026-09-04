@@ -21,8 +21,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
-    QScrollArea,
-    QSizePolicy,
     QSplitter,
     QStackedWidget,
     QVBoxLayout,
@@ -420,6 +418,6 @@ class AppShell(QMainWindow):
         if isinstance(name, str) and name:
             self.set_assistant_name(name)
 
-    def closeEvent(self, event) -> None:  # noqa: N802 — Qt override
+    def closeEvent(self, event) -> None:
         self._unsubscribe_events()
         super().closeEvent(event)

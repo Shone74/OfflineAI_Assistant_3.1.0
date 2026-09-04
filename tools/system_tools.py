@@ -74,7 +74,7 @@ def _query_gpu() -> str:
             ram_mb = getattr(gpu, "AdapterRAM", 0)
             ram_mb = ram_mb / (1024 * 1024) if ram_mb else 0
             return f"{name} ({ram_mb:.0f} MB)" if ram_mb else name
-    except Exception:  # noqa: BLE001 — GPU detection is best-effort
+    except Exception:
         return "N/A"
     finally:
         _GPU_QUERY_ATTEMPTED = True
@@ -218,7 +218,7 @@ class ProcessInfoTool(Tool):
             return ToolResult(
                 success=False, message=str(exc), error="AccessDenied"
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ToolResult(
                 success=False, message=str(exc), error="ProcessError"
             )

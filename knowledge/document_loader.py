@@ -34,13 +34,13 @@ class DocumentLoader:
                 from pypdf import PdfReader
 
                 return "\n".join((pg.extract_text() or "") for pg in PdfReader(str(path)).pages)
-            except Exception:  # noqa: BLE001, S110 — backend unavailable, fall back
+            except Exception:
                 pass
             try:
                 from fitz import open as fitz_open
 
                 return "\n".join(pg.get_text() for pg in fitz_open(str(path)))
-            except Exception:  # noqa: BLE001, S110 — backend unavailable, fall back
+            except Exception:
                 pass
 
         if ext == ".docx":
@@ -48,13 +48,13 @@ class DocumentLoader:
                 from docx import Document as DocxDocument
 
                 return "\n".join(p.text for p in DocxDocument(str(path)).paragraphs)
-            except Exception:  # noqa: BLE001, S110 — backend unavailable, fall back
+            except Exception:
                 pass
             try:
                 from docx2txt import process
 
                 return process(str(path))
-            except Exception:  # noqa: BLE001, S110 — backend unavailable, fall back
+            except Exception:
                 pass
 
         if ext in (".html", ".htm"):
@@ -68,7 +68,7 @@ class DocumentLoader:
             from bs4 import BeautifulSoup
 
             return BeautifulSoup(html, "html.parser").get_text("\n")
-        except Exception:  # noqa: BLE001 — fall back to regex tag stripping
+        except Exception:
             return re.sub(r"<[^>]+>", "", html)
 
     # ------------------------------------------------------------------ #

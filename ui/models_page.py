@@ -44,7 +44,7 @@ class ModelLoadWorker(QThread):
         try:
             model = self._model_manager.activate_model(self._model_name)
             self.finished.emit(model.name, "")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Model load worker failed: %s", exc)
             self.finished.emit("", str(exc))
 
@@ -224,7 +224,7 @@ class ModelsPage(QWidget):
                 if engine is not None and hasattr(engine, "configure"):
                     try:
                         engine.configure(self._model_manager)
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         logger.warning("Engine reconfiguration after folder change failed: %s", exc)
             self._details.setText(
                 f"<b>Models Folder:</b> {directory}<br>"
@@ -340,7 +340,7 @@ class ModelsPage(QWidget):
             if engine is not None and hasattr(engine, "configure"):
                 try:
                     engine.configure(self._model_manager)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.error("Engine configuration after model load failed: %s", exc)
 
         # Publish MODEL_LOADED so MainWindow._on_model_loaded can update

@@ -99,7 +99,7 @@ class GenerationWorker(QThread):
                 pulse_callback=lambda: None,
                 publish_fn=_noop_publish,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self.generation_failed.emit(str(exc))
             return
         if self._cancel_event.is_set():
@@ -853,7 +853,7 @@ class MainWindow(QMainWindow):
                 if engine is not None and hasattr(engine, "configure"):
                     try:
                         engine.configure(mm)
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         logger.warning("Engine reconfiguration after models_dir change failed: %s", exc)
                         if hasattr(self, "_models_page"):
                             self._models_page.set_model_manager(mm)
@@ -1234,7 +1234,7 @@ class MainWindow(QMainWindow):
         try:
             self._assistant.switch_model(model_name)
             self._status.showMessage(f"Switched to model: {model_name}", 3000)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Model switch failed: %s", exc)
             QMessageBox.critical(
                 self,

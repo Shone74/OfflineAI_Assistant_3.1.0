@@ -1097,6 +1097,6 @@ def create_audio(
             if am.is_available():
                 return am
             log.info("sounddevice backend unavailable (no input device), using stub AudioManager")
-        except Exception:  # noqa: BLE001 — backend unusable, fall back to stub
+        except Exception:
             log.info("SoundDeviceAudioManager init failed, using stub AudioManager")
     return StubAudioManager(config=config)

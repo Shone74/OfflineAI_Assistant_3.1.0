@@ -201,7 +201,7 @@ class TestHomePageRedesign:
         routes: list[str] = []
         page = self._make_home(navigator=lambda r: routes.append(r))
         # klik na primary dugme unutar hero kartice
-        buttons = page._hero.findChildren(object)
+        page._hero.findChildren(object)
         from PySide6.QtWidgets import QPushButton
 
         primary = next(

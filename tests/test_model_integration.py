@@ -74,7 +74,7 @@ class TestModelIntegration:
 
         config = ConfigManager()
         n_ctx = config.get("ai.n_ctx", 512)
-        max_tokens = config.get("ai.max_tokens", 204)
+        config.get("ai.max_tokens", 204)
         # Korisnikove postavke: 4096/1024 (faza 6.3). Defaultovi su nizi.
         if n_ctx <= 512:
             pytest.skip("Lokalne settings.json sa starim vrednostima — preskacemo")

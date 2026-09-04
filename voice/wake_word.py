@@ -152,6 +152,6 @@ def create_wake_word(preferred: str = "openwakeword", hotword: str = "hey") -> W
     if preferred == "openwakeword":
         try:
             return OpenWakeWord(hotword=hotword)
-        except Exception:  # noqa: BLE001  — optional backend, fall back to stub
+        except Exception:
             logger.info("openwakeword unavailable, using stub")
     return StubWakeWord()

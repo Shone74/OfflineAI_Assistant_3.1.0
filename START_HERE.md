@@ -1,31 +1,37 @@
-# START HERE — Offline AI Assistant Final Application
+# START HERE — Offline AI Assistant
 
-## Launch
-Double-click `run.py` or run:
+## Pokretanje
 ```
 python run.py
 ```
+(dupli klik na `run.py` takođe radi)
 
-## First launch
-On first launch the app creates local folders under `%LOCALAPPDATA%\OfflineAI\`:
+## Prvo pokretanje
+Kreiraju se folderi u `%LOCALAPPDATA%\OfflineAI\`:
 - `config\settings.json`
 - `data\assistant.db`
 - `logs\`
 - `models\llm\`
 
-## Models
-Real chat requires a local `.gguf` model. Place it in:
+Pa se pokreće instalacioni wizard (7 koraka). Ako nema modela, aplikacija
+radi u limited (stub) modu — dodaj model kroz Models stranicu.
+
+## Modeli
+Stavi `.gguf` fajl u jedan od:
 ```
-%LOCALAPPDATA%\OfflineAI\models\llm\
+%LOCALAPPDATA%\OfflineAI\models\llm\       (default)
+models\llm\                                 (folder projekta)
 ```
+Ollama/LM Studio modeli se otkrivaju automatski.
 
-The app discovers GGUF models, Ollama storage, and LM Studio directories automatically.
+Preporučeno: Qwen2.5-Coder-7B Q4_K_M (~4.4 GB).
 
-## Requirements
-- Python >= 3.13
-- Windows 10/11
-- See `requirements.txt`
+## GPU (opciono)
+Aplikacija sama koristi NVIDIA GPU ako je dostupan CUDA-enabled
+llama-cpp-python (vidi README §GPU ubrzanje).
 
-## Troubleshooting
-- If the app fails to start, check `%LOCALAPPDATA%\OfflineAI\logs\` for error details.
-- If no model is available, the app will start in a limited mode. Use the Models page to add or select a model.
+## Problemi?
+- Logovi: `%LOCALAPPDATA%\OfflineAI\logs\`
+- Testovi: `pytest tests/` (92 testa)
+- Runtime test: `python main_original.py --test-runtime`
+- Dokumentacija: `docs/` folder (plan, status, dizajn, modeli)

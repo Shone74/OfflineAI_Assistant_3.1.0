@@ -226,7 +226,7 @@ class LLMPlanner(Planner):
                 "LLMPlanner.parse_plan returned None for goal '%s' "
                 "(falling back to StubPlanner)", goal[:80],
             )
-        except Exception as exc:  # noqa: BLE001 — parse failed, fall back to stub
+        except Exception as exc:
             logger.warning(
                 "LLMPlanner.plan failed for goal '%s' (%s: %s) — "
                 "falling back to StubPlanner", goal[:80], type(exc).__name__, exc,
@@ -352,7 +352,7 @@ class LLMPlanner(Planner):
 
         try:
             data = json.loads(raw.strip())
-        except Exception:  # noqa: BLE001 — parse failed, fall back to stub
+        except Exception:
             return None
         if not isinstance(data, list):
             return None

@@ -281,7 +281,7 @@ class TestToolsAndSecurity:
         assert decision is not None
 
     def test_path_validation_blocks_traversal(self, tmp_path):
-        from tools.file_security import PathValidator, PathValidationError
+        from tools.file_security import PathValidationError, PathValidator
 
         validator = PathValidator(read_roots=[tmp_path], write_roots=[tmp_path])
         # Validna citanja unutar root-a prolaze

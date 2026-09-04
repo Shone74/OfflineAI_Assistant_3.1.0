@@ -1658,7 +1658,7 @@ class VoiceSettingsTab(QWidget):
                     engine.setProperty("voice", v.id)
                     self._tts_voice_combo.addItem(v.name, v.id)
                 engine.stop()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.debug("TTS voice enumeration failed: %s", exc)
         if self._tts_voice_combo.count() == 0:
             self._tts_voice_combo.addItem("None available")
@@ -2118,7 +2118,7 @@ class MemorySettingsTab(QWidget):
                     is_real_model_available=True,
                     fallback_reason=None
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Failed to refresh runtime status: %s", exc)
 
     def save_settings(self, config: ConfigManager) -> None:

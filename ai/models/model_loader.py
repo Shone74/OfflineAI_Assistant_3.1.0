@@ -373,7 +373,7 @@ def is_gpu_available() -> bool:
     try:
         from llama_cpp import llama_supports_gpu_offload
         return llama_supports_gpu_offload()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -385,7 +385,7 @@ def get_gpu_vram_bytes() -> int:
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
         info = pynvml.nvmlDeviceGetMemoryInfo(handle)
         return info.total
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0
 
 
@@ -672,7 +672,7 @@ class GGUFModelLoader(ModelLoader):
         if self._model is not None:
             try:
                 self._model.close()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("Llama.close() failed during unload: %s", exc)
         self._model = None
         self._model_path = None
@@ -714,7 +714,7 @@ class GGUFModelLoader(ModelLoader):
             transcript = self._build_chat_transcript(messages)
             tokens = self._model.tokenize(transcript.encode("utf-8"), add_bos=True)
             return len(tokens)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Token counting failed, using character estimate: %s", exc)
             total_chars = sum(len(m.get("content", "")) for m in messages)
             return total_chars // 4
@@ -733,7 +733,7 @@ class GGUFModelLoader(ModelLoader):
             if tokenizer is not None and hasattr(tokenizer, "apply_chat_template"):
                 try:
                     return tokenizer.apply_chat_template(messages, tokenize=False)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.debug("Chat template failed, using fallback: %s", exc)
 
         parts: list[str] = []
@@ -802,7 +802,7 @@ def _build_model_info(path: Path, source: ModelSource) -> ModelInfo | None:
     try:
         caps = _extract_capabilities(path, model_name=path.stem)
         metadata = _extract_metadata(path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("Could not extract metadata from %s: %s", path.name, exc)
 
     info = ModelInfo(
@@ -833,7 +833,7 @@ def _extract_metadata(path: Path) -> dict[str, Any]:
         llama = Llama(model_path=str(path), n_ctx=1, n_threads=1, verbose=False)
         if hasattr(llama, "n_ctx_train") and llama.n_ctx_train:
             result["context_length"] = llama.n_ctx_train
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("Could not extract GGUF metadata from %s: %s", path, exc)
     return result
 
@@ -1094,7 +1094,7 @@ def _read_gguf_metadata(path: Path, max_keys: int = 2000) -> dict[str, str] | No
                         metadata[key] = f"<type:{val_type}>"
 
             return metadata
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("Failed to read GGUF metadata from %s", path)
         return None
 
@@ -1200,7 +1200,7 @@ def _extract_capabilities(path: Path, model_name: str = "") -> ModelCapabilities
                     caps.multimodal = True
                 if dims > 4096:
                     caps.long_context = True
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("Failed to extract capabilities from %s", path)
     return caps
 
@@ -1252,7 +1252,7 @@ def _add_cuda_dll_directories() -> None:
                         current_path = os.environ.get("PATH", "")
                         if dll_dir not in current_path:
                             os.environ["PATH"] = os.pathsep.join([dll_dir, current_path])
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("Could not add CUDA DLL directories: %s", exc)
 
 

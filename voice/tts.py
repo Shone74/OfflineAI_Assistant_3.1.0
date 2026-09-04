@@ -48,7 +48,7 @@ class Pyttsx3TTS(TTSProvider):
     def voices(self) -> list[str]:
         try:
             return [v.id for v in self._engine.getProperty("voices")]
-        except Exception:  # noqa: BLE001
+        except Exception:
             return []
 
     def set_voice(self, voice_id: str) -> None:
@@ -80,6 +80,6 @@ def create_tts(preferred: str = "pyttsx3") -> TTSProvider:
     if preferred == "pyttsx3":
         try:
             return Pyttsx3TTS()
-        except Exception:  # noqa: BLE001  — optional backend, fall back to stub
+        except Exception:
             log.info("pyttsx3 unavailable, using stub TTS")
     return StubTTS()

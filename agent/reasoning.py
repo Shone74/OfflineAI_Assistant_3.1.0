@@ -65,7 +65,7 @@ class LLMReasoner:
             answer = "".join(self._engine.generate_stream(prompt, config=self._generation_config))
             if "no" in answer.strip().lower()[:12]:
                 return False
-        except Exception:  # noqa: BLE001 — best-effort fallback to stub
+        except Exception:
             return self._fallback.should_continue(task_status, observation)
         self._iterations += 1
         return self._iterations < self._max_iterations

@@ -10,8 +10,6 @@ import re
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 _HEX_RE = re.compile(r"#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b")
@@ -32,8 +30,6 @@ PAGE_MODULES = [
 class TestPagesUseDesignTokens:
     def test_module_constants_from_tokens(self):
         """Nakon import-a, konstante boja moraju odgovarati WORKSPACE paleti."""
-        from ui.design import WORKSPACE
-
         import ui.agents_page as agents
         import ui.assistant_hub as hub
         import ui.capabilities_page as caps
@@ -41,6 +37,7 @@ class TestPagesUseDesignTokens:
         import ui.memory_page as memory
         import ui.projects_page as projects
         import ui.tools_page as tools
+        from ui.design import WORKSPACE
 
         for mod in (agents, hub, caps, memory, projects, tools):
             assert mod._EMERALD == WORKSPACE.emerald, (

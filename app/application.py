@@ -68,7 +68,7 @@ def _has_display() -> bool:
             user32 = ctypes.windll.user32
             if user32.GetProcessWindowStation() is None:
                 return False
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.debug("Display check failed: %s", exc)
     return True
 
@@ -109,7 +109,7 @@ class _StartupModelLoadWorker(QThread):
                     self.failure.emit("No model loaded")
             else:
                 self.failure.emit("No models available")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("Startup model load failed: %s", exc)
             self.failure.emit(str(exc))
 
@@ -297,7 +297,7 @@ class ApplicationManager:
             plugins_dir = self._config.get("plugins.directory", "plugins")
             n = self._plugin_manager.discover_and_load(plugins_dir)
             logger.info("Plugin manager ready — %d plugin(s) loaded", n)
-        except Exception:  # noqa: BLE001 — plugin loading must never block startup
+        except Exception:
             logger.warning("Plugin loading failed — continuing without plugins")
         self._plugin_manager.load_plugin_states()
 
@@ -314,7 +314,7 @@ class ApplicationManager:
                     loaded_count,
                     knowledge_path,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to load persisted knowledge from %s", knowledge_path)
 
         # Index documents from knowledge directory
@@ -330,7 +330,7 @@ class ApplicationManager:
                 )
             else:
                 logger.info("Knowledge base ready - %d chunk(s) from %d persisted", loaded_count, loaded_count)
-        except Exception:  # noqa: BLE001 — knowledge indexing is best-effort
+        except Exception:
             logger.info("Knowledge base ready (no indexed documents)")
 
         self._db_manager = DatabaseManager()
@@ -382,14 +382,14 @@ class ApplicationManager:
                 loaded = self._automation.load_file(workflow_path)
                 if loaded > 0:
                     logger.info("Loaded %d persisted workflow(s) from %s", loaded, workflow_path)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to load persisted workflows from %s", workflow_path)
 
             try:
                 loaded_tasks = self._automation.load_tasks(tasks_path)
                 if loaded_tasks > 0:
                     logger.info("Loaded %d scheduled task(s) from %s", loaded_tasks, tasks_path)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to load scheduled tasks from %s", tasks_path)
 
             logger.info("Automation manager ready (system_check workflow + scheduler)")
@@ -579,7 +579,7 @@ class ApplicationManager:
                 knowledge_path = knowledge_dir / knowledge_file
                 self._knowledge.save_file(knowledge_path)
                 logger.info("Knowledge persisted to %s", knowledge_path)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to persist knowledge")
 
         # Save workflow persistence before shutdown
@@ -594,7 +594,7 @@ class ApplicationManager:
                 logger.info("Workflows persisted to %s", workflow_path)
                 self._automation.save_tasks(tasks_path)
                 logger.info("Scheduled tasks persisted to %s", tasks_path)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to persist workflows/tasks")
 
         # Save plugin enable/disable state before shutdown
@@ -603,7 +603,7 @@ class ApplicationManager:
             try:
                 plugin_manager.save_plugin_states()
                 logger.info("Plugin states persisted")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("Failed to persist plugin states")
 
         if self._memory is not None:

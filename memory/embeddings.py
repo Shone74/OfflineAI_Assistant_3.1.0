@@ -190,7 +190,7 @@ def _resolve_embedding_model_path(explicit: str | Path | None = None) -> Path | 
         from core.paths import LLM_DIR
 
         llm_dir = Path(LLM_DIR)
-    except Exception:  # noqa: BLE001 — paths module optional
+    except Exception:
         llm_dir = None
     candidates = []
     if llm_dir is not None:
@@ -229,7 +229,7 @@ def load_embedding_model(name: str = "stub", model_path: str | None = None) -> E
             if resolved is None:
                 raise FileNotFoundError("mxbai GGUF embedding model not found")
             return GgufEmbeddingModel(resolved)
-        except Exception:  # noqa: BLE001 — broad fallback to stub
+        except Exception:
             logger.warning("Gguf embedding model unavailable — falling back to stub")
             stub = StubEmbeddingModel()
             stub.set_intended_name(name)
@@ -237,7 +237,7 @@ def load_embedding_model(name: str = "stub", model_path: str | None = None) -> E
     if name == "sentence-transformers":
         try:
             return SentenceTransformerEmbeddingModel()
-        except Exception:  # noqa: BLE001 — broad fallback to stub
+        except Exception:
             logger.warning("sentence-transformers unavailable — falling back to stub")
             stub = StubEmbeddingModel()
             stub.set_intended_name(name)

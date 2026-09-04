@@ -11,29 +11,27 @@ import sys
 from PySide6.QtWidgets import QApplication, QWidget
 
 from app.application import ApplicationManager
-from ui.app_shell import AppShell
-from ui.home_page import HomePage
-from ui.assistant_hub import AssistantHub
-from ui.chat_widget import ChatWidget
-from ui.memory_page import MemoryPage
-from ui.knowledge_dashboard import KnowledgeDashboard
-from ui.models_page import ModelsPage
-from ui.capabilities_page import CapabilitiesPage
-from ui.projects_page import ProjectsPage
 from ui.agents_page import AgentsPage
+from ui.app_shell import AppShell
+from ui.assistant_hub import AssistantHub
+from ui.automation_dashboard import AutomationDashboard
+from ui.capabilities_page import CapabilitiesPage
+from ui.chat_widget import ChatWidget
+from ui.home_page import HomePage
+from ui.knowledge_dashboard import KnowledgeDashboard
+from ui.memory_page import MemoryPage
+from ui.models_page import ModelsPage
+from ui.projects_page import ProjectsPage
+from ui.settings_page import SettingsPage
 from ui.tools_page import ToolsPage
 from ui.voice_page import VoicePage
-from ui.automation_dashboard import AutomationDashboard
 from ui.workflow_builder import WorkflowBuilder
-from ui.settings_page import SettingsPage
 
 
 def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWidget]]:
     assistant = manager._assistant
     config = manager._config
     event_bus = manager._event_bus
-    theme = manager._theme
-    security = manager._security
     voice = manager._voice
     plugin_manager = manager._plugin_manager
     automation_manager = manager._automation

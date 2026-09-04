@@ -243,7 +243,7 @@ class AgentsPage(QWidget):
             try:
                 tools: list[dict[str, Any]] = self._tool_registry()
                 return [str(t.get("name", "")) for t in tools if t.get("name")]
-            except Exception:  # noqa: BLE001 — best-effort
+            except Exception:
                 return []
         return []
 
@@ -448,7 +448,7 @@ class AgentsPage(QWidget):
             try:
                 self._repo.create_agent(agent)
                 logger.info("Agent added: %s", agent.name)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self._show_error("Add Agent", str(exc))
                 return
             self.refresh()
@@ -465,7 +465,7 @@ class AgentsPage(QWidget):
             try:
                 self._repo.update_agent(updated)
                 logger.info("Agent %d updated: %s", agent.id, updated.name)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self._show_error("Edit Agent", str(exc))
                 return
             self.refresh()
@@ -494,7 +494,7 @@ class AgentsPage(QWidget):
             try:
                 self._repo.delete_agent(agent.id)
                 logger.info("Agent deleted: %s (id=%s)", agent.name, agent.id)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self._show_error("Delete Agent", str(exc))
                 return
             self.refresh()
@@ -509,7 +509,7 @@ class AgentsPage(QWidget):
             else:
                 self._repo.enable_agent(agent.id)
                 logger.info("Agent enabled: %s (id=%s)", agent.name, agent.id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._show_error("Toggle Agent", str(exc))
             return
         self.refresh()

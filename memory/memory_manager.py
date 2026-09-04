@@ -393,7 +393,7 @@ class MemoryManager:
         if max_memories > 0 and self._has_real_embedding_model():
             try:
                 semantic = self.semantic_search(user_input, k=max_memories)
-            except Exception:  # noqa: BLE001 — semantic failure must never break chat
+            except Exception:
                 logger.warning("Semantic retrieval failed — using keyword-only results")
                 semantic = []
 

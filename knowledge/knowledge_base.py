@@ -80,7 +80,7 @@ class KnowledgeBase:
             for file_path in root.rglob(pattern):
                 try:
                     total += self.index_document(file_path)
-                except Exception:  # noqa: BLE001 — log and continue with next file
+                except Exception:
                     from core.logger import get_logger
 
                     get_logger("knowledge").exception("Failed to index %s", file_path)
@@ -302,7 +302,7 @@ class KnowledgeBase:
                 count = self.index_document(source_path)
                 if count > 0:
                     loaded += 1
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Failed to index persisted document %s: %s", doc_path, e)
 
         return loaded

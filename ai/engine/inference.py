@@ -81,5 +81,5 @@ class InferenceSession:
             for token in token_iter:
                 self.add_token(token)
             return self.complete().response
-        except Exception as exc:  # noqa: BLE001 — re-throw as failure
+        except Exception as exc:
             return self.fail(str(exc)).response

@@ -210,7 +210,7 @@ class AgentVerifier:
             prompt = self._build_ai_eval_prompt(goal, result)
             raw = self._llm_engine.generate(prompt, config=self._generation_config)
             return self._parse_ai_eval_response(raw)
-        except Exception:  # noqa: BLE001 — best-effort AI evaluation must never break verification
+        except Exception:
             logger.warning("AI evaluation failed — returning objective-only result")
             return None
 

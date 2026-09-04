@@ -11,15 +11,10 @@ Layout po dizajnu:
 from __future__ import annotations
 
 import psutil
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
-    QPushButton,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -210,7 +205,7 @@ class HomePage(QWidget):
             if self._assistant is not None:
                 memory = getattr(self._assistant, "_memory", None)
                 if memory is not None:
-                    histories = getattr(getattr(memory, "_short_term", None), "get_history", lambda: [])()
+                    histories = getattr(getattr(memory, "_short_term", None), "get_history", list)()
                     self._memory_card.set_value(f"{len(histories)} recent messages")
         except Exception:
             pass

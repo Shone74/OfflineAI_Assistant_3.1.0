@@ -382,7 +382,7 @@ class CalculateTool(Tool):
             return ToolResult(
                 success=False, message="Deljenje nulom", error="DivisionByZero"
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return ToolResult(
                 success=False, message=str(exc), error="CalculationError"
             )

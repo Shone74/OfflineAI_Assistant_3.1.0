@@ -12,7 +12,6 @@ from typing import Any
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
-    QHBoxLayout,
     QLabel,
     QVBoxLayout,
     QWidget,
