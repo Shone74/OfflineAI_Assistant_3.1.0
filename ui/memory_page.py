@@ -38,19 +38,21 @@ from memory.memory_manager import MemoryManager
 
 logger = get_logger("ui.memory_page")
 
-_GRAPHITE = "#111516"
-_GRAPHITE_CARD = "#1C2221"
-_GRAPHITE_DARK_CARD = "#191F1E"
-_GRAPHITE_BORDER = "#29302E"
-_EMERALD = "#1D8A68"
-_EMERGENCY_HOVER = "#249E78"
-_EMERALD_TEXT = "#62C7A3"
-_EMERALD_BG_TINT = "rgba(29,138,104,0.15)"
-_EMERALD_BORDER_TINT = "rgba(29,138,104,0.4)"
-_TEXT_PRIMARY = "#EDF3F0"
-_TEXT_SECONDARY = "#8C9692"
-_TEXT_MUTED = "#737D79"
-_DANGER = "#D96565"
+from ui.design import WORKSPACE as _PALETTE
+
+_GRAPHITE = _PALETTE.surface_dark
+_GRAPHITE_CARD = _PALETTE.surface_card
+_GRAPHITE_DARK_CARD = _PALETTE.surface_dark
+_GRAPHITE_BORDER = _PALETTE.border
+_EMERALD = _PALETTE.emerald
+_EMERGENCY_HOVER = _PALETTE.emerald_hover
+_EMERALD_TEXT = _PALETTE.emerald_text
+_EMERALD_BG_TINT = _PALETTE.tint(0.15)
+_EMERALD_BORDER_TINT = _PALETTE.tint(0.4)
+_TEXT_PRIMARY = _PALETTE.text_primary
+_TEXT_SECONDARY = _PALETTE.text_secondary
+_TEXT_MUTED = _PALETTE.text_muted
+_DANGER = _PALETTE.error
 
 _TYPE_LABELS = {
     MemoryType.USER_PREFERENCE.value: "User Preference",
@@ -265,14 +267,14 @@ class MemoryPage(QWidget):
             f"QPushButton {{ padding: 4px 12px; border-radius: 6px; background: {_EMERALD};"
             f" color: {_TEXT_PRIMARY}; border: none; }}"
             f"QPushButton:hover {{ background: {_EMERGENCY_HOVER}; }}"
-            f"QPushButton:pressed {{ background: #245846; }}"
+            f"QPushButton:pressed {{ background: {_PALETTE.success_bg}; }}"
         )
 
     def _danger_btn_css(self) -> str:
         return (
             f"QPushButton {{ padding: 4px 12px; border-radius: 6px; background: {_GRAPHITE_DARK_CARD};"
             f" color: {_DANGER}; border: 1px solid {_GRAPHITE_BORDER}; }}"
-            f"QPushButton:hover {{ background: rgba(217,101,101,0.10); }}"
+            f"QPushButton:hover {{ background: {_PALETTE.error_tint(0.10)}; }}"
         )
 
     def _small_btn_css(self) -> str:

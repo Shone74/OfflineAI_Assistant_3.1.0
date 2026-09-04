@@ -43,15 +43,17 @@ if TYPE_CHECKING:
 
 logger = get_logger("ui.tools_page")
 
-_GRAPHITE = "#151819"
-_GRAPHITE_CARD = "#1C2221"
-_GRAPHITE_BORDER = "#29302E"
-_TEXT_PRIMARY = "#EDF3F0"
-_TEXT_SECONDARY = "#8C9692"
-_TEXT_MUTED = "#737D79"
-_EMERALD = "#1D8A68"
-_AMBER = "#D4A72C"
-_RED = "#C0392B"
+from ui.design import WORKSPACE as _PALETTE
+
+_GRAPHITE = _PALETTE.surface
+_GRAPHITE_CARD = _PALETTE.surface_card
+_GRAPHITE_BORDER = _PALETTE.border
+_TEXT_PRIMARY = _PALETTE.text_primary
+_TEXT_SECONDARY = _PALETTE.text_secondary
+_TEXT_MUTED = _PALETTE.text_muted
+_EMERALD = _PALETTE.emerald
+_AMBER = _PALETTE.warning
+_RED = _PALETTE.error
 
 
 _STATUS_COLORS = {
@@ -236,8 +238,11 @@ class _ToolCard(QFrame):
 
 
 def _btn_style(bg: str = "#3A3F40") -> str:
+    # bg parametar ostaje radi kompatibilnosti poziva; default dolazi iz palete
+    if bg == "#3A3F40":
+        bg = _PALETTE.surface_card
     return (
-        f"QPushButton {{ background: {bg}; color: {_GRAPHITE};"
+        f"QPushButton {{ background: {bg}; color: {_TEXT_PRIMARY};"
         f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px; font-size: 10px; }}"
         f"QPushButton:hover {{ background: {_EMERALD}; }}"
     )

@@ -149,18 +149,28 @@ class ModelsPage(QWidget):
 
     def set_model_status(self, status: ModelStatus, message: str = "") -> None:
         """Update the status label with a model load state."""
+        from ui.design import WORKSPACE as palette
+
         display = status.description
         if message:
             display = f"{display} — {message}"
         self._status_label.setText(f"Status: {display}")
         if status == ModelStatus.MODEL_AVAILABLE:
-            self._status_label.setStyleSheet("QLabel { color: #1D8A68; font-weight: bold; }")
+            self._status_label.setStyleSheet(
+                f"QLabel {{ color: {palette.emerald_text}; font-weight: bold; }}"
+            )
         elif status in (ModelStatus.LOAD_FAILED, ModelStatus.RUNTIME_UNAVAILABLE):
-            self._status_label.setStyleSheet("QLabel { color: #D96565; font-weight: bold; }")
+            self._status_label.setStyleSheet(
+                f"QLabel {{ color: {palette.error}; font-weight: bold; }}"
+            )
         elif status == ModelStatus.LOADING:
-            self._status_label.setStyleSheet("QLabel { color: #D6A24A; font-weight: bold; }")
+            self._status_label.setStyleSheet(
+                f"QLabel {{ color: {palette.warning}; font-weight: bold; }}"
+            )
         else:
-            self._status_label.setStyleSheet("QLabel { color: #8C9692; }")
+            self._status_label.setStyleSheet(
+                f"QLabel {{ color: {palette.text_secondary}; }}"
+            )
 
     def _on_model_selected(self, item: QListWidgetItem) -> None:
         model_name = item.data(1000)

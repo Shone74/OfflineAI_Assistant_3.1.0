@@ -41,21 +41,23 @@ from core.logger import get_logger
 
 logger = get_logger("projects_page")
 
-_GRAPHITE = "#151819"
-_GRAPHITE_CARD = "#1C2221"
-_GRAPHITE_DARK_CARD = "#191F1E"
-_GRAPHITE_BORDER = "#29302E"
-_EMERALD = "#1D8A68"
-_EMERGENCY_HOVER = "#249E78"
-_EMERALD_TEXT = "#62C7A3"
-_EMERALD_BG_TINT = "rgba(29, 138, 104, 0.08)"
-_EMERALD_BORDER_TINT = "rgba(29, 138, 104, 0.25)"
-_TEXT_PRIMARY = "#EDF3F0"
-_TEXT_SECONDARY = "#8C9692"
-_TEXT_MUTED = "#737D79"
-_RED = "#C0392B"
-_ORANGE = "#E67E22"
-_BLUE = "#3498DB"
+from ui.design import WORKSPACE as _PALETTE
+
+_GRAPHITE = _PALETTE.surface
+_GRAPHITE_CARD = _PALETTE.surface_card
+_GRAPHITE_DARK_CARD = _PALETTE.surface_dark
+_GRAPHITE_BORDER = _PALETTE.border
+_EMERALD = _PALETTE.emerald
+_EMERGENCY_HOVER = _PALETTE.emerald_hover
+_EMERALD_TEXT = _PALETTE.emerald_text
+_EMERALD_BG_TINT = _PALETTE.tint(0.08)
+_EMERALD_BORDER_TINT = _PALETTE.tint(0.25)
+_TEXT_PRIMARY = _PALETTE.text_primary
+_TEXT_SECONDARY = _PALETTE.text_secondary
+_TEXT_MUTED = _PALETTE.text_muted
+_RED = _PALETTE.error
+_ORANGE = _PALETTE.warning
+_BLUE = "#4A90D9"  # info akcenat (van zvanične palete; jedini izuzetak)
 
 
 class ProjectsPage(QWidget):

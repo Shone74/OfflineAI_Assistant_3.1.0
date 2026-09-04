@@ -182,14 +182,41 @@ class ChatWidget(QWidget):
         layout = QHBoxLayout()
         layout.setSpacing(8)
 
+        self._header_title = QLabel()
+        self._header_title.setObjectName("chat_assistant_name")
+        self._header_status = QLabel("● Local AI")
+        self._header_status.setObjectName("status_local")
+
+        # Capability dugmad po dizajnu (Vision disabled — multimodalna
+        # inferencija nije implementirana, vidi docs/models_report.md)
+        self._btn_files = QPushButton("📎 Files")
+        self._btn_files.setObjectName("capability_button")
+        self._btn_vision = QPushButton("🖼 Vision")
+        self._btn_vision.setObjectName("capability_button")
+        self._btn_vision.setEnabled(False)
+        self._btn_vision.setToolTip("Vision support dolazi u novijoj verziji")
+        self._btn_memory = QPushButton("🧠 Memory")
+        self._btn_memory.setObjectName("capability_button")
+
         self._btn_new_chat = QPushButton("New Chat")
+        self._btn_new_chat.setObjectName("secondary_button")
         self._btn_export = QPushButton("Export")
+        self._btn_export.setObjectName("secondary_button")
         self._btn_export_selected = QPushButton("Export Selected")
+        self._btn_export_selected.setObjectName("secondary_button")
         self._btn_search = QPushButton("Search Memory")
+        self._btn_search.setObjectName("secondary_button")
         self._project_label = QLabel()
-        self._project_label.setStyleSheet("color: #1D8A68; font-size: 10px; font-weight: 600;")
+        self._project_label.setObjectName("status_local")
         self._project_label.setVisible(False)
 
+        layout.addWidget(self._header_title)
+        layout.addWidget(self._header_status)
+        layout.addSpacing(12)
+        layout.addWidget(self._btn_files)
+        layout.addWidget(self._btn_vision)
+        layout.addWidget(self._btn_memory)
+        layout.addSpacing(12)
         layout.addWidget(self._btn_new_chat)
         layout.addWidget(self._btn_export)
         layout.addWidget(self._btn_export_selected)
@@ -203,6 +230,10 @@ class ChatWidget(QWidget):
         self._btn_search.clicked.connect(self._on_search)
 
         return layout
+
+    def set_assistant_display_name(self, name: str) -> None:
+        """Postavi ime asistenta u chat header (workspace dizajn)."""
+        self._header_title.setText(name)
 
     def set_project_context(self, project_name: str, project_id: str | None = None) -> None:
         """Display the active project context in the chat header."""
@@ -275,32 +306,24 @@ class ChatWidget(QWidget):
         layout.setSpacing(8)
 
         self._input = QTextEdit()
-        self._input.setPlaceholderText("Enter message...")
-        self._input.setFixedHeight(30)
+        self._input.setPlaceholderText("Type a message...")
+        self._input.setFixedHeight(38)
         self._input.textChanged.connect(self._on_text_changed)
         self._input.setAccessibleName("Chat message input")
         layout.addWidget(self._input, stretch=1)
 
-        self._send_btn = QPushButton("Send")
+        self._send_btn = QPushButton("➤")
+        self._send_btn.setObjectName("send_button")
         self._send_btn.setEnabled(False)
         self._send_btn.clicked.connect(self._on_send_clicked)
         self._send_btn.setAccessibleName("Send message")
-        self._send_btn.setStyleSheet(
-            "QPushButton { padding: 4px 12px; border-radius: 6px; }"
-            "QPushButton { background: #1D8A68; color: #EDF3F0; border: none; }"
-            "QPushButton:hover { background: #249E78; }"
-            "QPushButton:pressed { background: #245846; }"
-        )
         layout.addWidget(self._send_btn)
 
-        self._stop_btn = QPushButton("\u25a0")
+        self._stop_btn = QPushButton("■")
+        self._stop_btn.setObjectName("danger_button")
         self._stop_btn.setToolTip("Stop generation")
         self._stop_btn.setAccessibleName("Stop generation")
-        self._stop_btn.setFixedSize(30, 30)
-        self._stop_btn.setStyleSheet(
-            "QPushButton { border-radius: 15px; color: #D96565; border: none; }"
-            "QPushButton:hover { background: #1C2221; }"
-        )
+        self._stop_btn.setFixedSize(38, 38)
         self._stop_btn.clicked.connect(self.stop_generation)
         self._stop_btn.setVisible(False)
         layout.addWidget(self._stop_btn)
@@ -308,30 +331,21 @@ class ChatWidget(QWidget):
         # Voice controls: a state-driven REC/STOP/PROCESSING toggle plus a PLAY
         # button that replays the most recent captured WAV.
         self._voice_btn = QPushButton("REC")
+        self._voice_btn.setObjectName("capability_button")
         self._voice_btn.setToolTip("Voice input")
         self._voice_btn.setAccessibleName("Voice input toggle")
         self._voice_btn.clicked.connect(self._on_voice_clicked)
         self._voice_btn.setMinimumWidth(80)
-        self._voice_btn.setFixedHeight(30)
-        self._voice_btn.setStyleSheet(
-            "QPushButton { border-radius: 6px; color: #8C9692; "
-            "border: 1px solid #3A3F3E; background: #2A2E2D; }"
-            "QPushButton:hover { background: #1C2221; }"
-            "QPushButton:disabled { color: #5A605F; background: #1F2221; }"
-        )
+        self._voice_btn.setFixedHeight(38)
         layout.addWidget(self._voice_btn)
 
         self._play_btn = QPushButton("PLAY")
+        self._play_btn.setObjectName("capability_button")
         self._play_btn.setToolTip("Play latest recording")
         self._play_btn.setAccessibleName("Play latest recording")
         self._play_btn.clicked.connect(self._on_play_clicked)
         self._play_btn.setMinimumWidth(60)
-        self._play_btn.setFixedHeight(30)
-        self._play_btn.setStyleSheet(
-            "QPushButton { border-radius: 6px; color: #8C9692; "
-            "border: 1px solid #3A3F3E; background: #2A2E2D; }"
-            "QPushButton:hover { background: #1C2221; }"
-        )
+        self._play_btn.setFixedHeight(38)
         self._play_btn.setVisible(False)
         layout.addWidget(self._play_btn)
 
