@@ -130,7 +130,7 @@ class ConfigManager:
             return
 
         try:
-            with open(self.settings_path, encoding="utf-8") as fh:
+            with open(self.settings_path, encoding="utf-8-sig") as fh:
                 self._data = json.load(fh)
         except (json.JSONDecodeError, OSError) as exc:
             logger.error("Failed to load settings: %s", exc)

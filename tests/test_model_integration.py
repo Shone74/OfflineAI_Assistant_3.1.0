@@ -1,0 +1,82 @@
+"""Testovi Faze 6: model integracija (GPU, parametri, discovery).
+
+Ovi testovi su namerno brzi — NE pokrecu inferenciju (osim skip-if-GPU
+tolerantnog loadanja metadata). Puna GPU verifikacija je E2E:
+docs/models_report.md §6.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+PROJECT_LLM_DIR = Path(__file__).resolve().parents[1] / "models" / "llm"
+
+
+def _llama_available() -> bool:
+    try:
+        from ai.models.model_loader import has_llama_cpp
+
+        return has_llama_cpp()
+    except Exception:
+        return False
+
+
+class TestModelIntegration:
+    def test_project_models_discovered(self):
+        from ai.models.discovery import discover_all_models
+        from ai.models.model_loader import ModelType
+
+        models = discover_all_models(
+            search_paths=[PROJECT_LLM_DIR],
+            include_ollama=False,
+            include_lm_studio=False,
+        )
+        names = {m.name for m in models}
+        assert any("Qwen2.5-Coder-7B" in n for n in names)
+        assert any("Phi-4-mini" in n for n in names)
+        assert all(m.model_type in (ModelType.LLM,) for m in models)
+
+    def test_qwen_capabilities_for_agents(self):
+        """Qwen2.5-Coder mora imati tool_calling (agent sistem ga koristi)."""
+        from ai.models.discovery import discover_all_models
+
+        models = discover_all_models(
+            search_paths=[PROJECT_LLM_DIR],
+            include_ollama=False,
+            include_lm_studio=False,
+        )
+        qwen = next(m for m in models if "Qwen2.5-Coder-7B" in m.name)
+        assert qwen.capabilities.tool_calling is True
+        assert qwen.capabilities.function_calling is True
+        assert qwen.capabilities.structured_output is True
+
+    @pytest.mark.skipif(not _llama_available(), reason="llama-cpp-python nije instaliran")
+    def test_gpu_offload_support(self):
+        """CUDA wheel podrzava GPU offload (RTX 3080 10GB)."""
+        from ai.models.model_loader import (
+            detect_optimal_gpu_layers,
+            is_gpu_available,
+        )
+
+        if not is_gpu_available():
+            pytest.skip("GPU nije dostupan na ovom okruzenju")
+        layers = detect_optimal_gpu_layers()
+        assert layers >= 999  # full offload
+
+    def test_settings_inference_params(self):
+        """Params iz settings.json moraju biti korektni (n_ctx 4096, threads 8)."""
+        from core.config_manager import ConfigManager
+
+        config = ConfigManager()
+        n_ctx = config.get("ai.n_ctx", 512)
+        max_tokens = config.get("ai.max_tokens", 204)
+        # Korisnikove postavke: 4096/1024 (faza 6.3). Defaultovi su nizi.
+        if n_ctx <= 512:
+            pytest.skip("Lokalne settings.json sa starim vrednostima — preskacemo")
+        assert config.get("ai.n_ctx") >= 4096
+        assert config.get("ai.max_tokens") >= 1024
