@@ -251,6 +251,10 @@ class AudioManager:
         self._state = RecordingState.IDLE
         logger.debug("AudioManager.stop() called")
 
+    def buffer_size(self) -> int:
+        """Current capture buffer size in bytes (0 in the stub)."""
+        return 0
+
     def save_last_recording(self, path: str | Path) -> None:
         """Persist the most recent completed recording to *path*.
 
@@ -829,6 +833,15 @@ class SoundDeviceAudioManager(AudioManager):
             self._stream = None
             self._buffer = bytearray()
             raise AudioCaptureError(f"failed to start recording: {exc}") from exc
+
+    def buffer_size(self) -> int:
+        """Vrati trenutnu veličinu capture buffer-a (bajtovi, thread-safe).
+
+        Koristi ga VoiceManager silence watchdog (Automatic Listening) da
+        detektuje kraj izjave: buffer koji ne raste = tišina.
+        """
+        with self._lock:
+            return len(self._buffer)
 
     def stop_recording(self) -> tuple[bytes, int]:
         """Stop the active stream and return the accumulated PCM bytes.

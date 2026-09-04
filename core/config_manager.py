@@ -98,6 +98,12 @@ _DEFAULTS: dict[str, Any] = {
             "rate": 200,
             "volume": 1.0,
         },
+        "wake_word": {
+            "enabled": True,
+            "provider": "openwakeword",
+            "hotword": "hey_jarvis",
+            "threshold": 0.5,
+        },
     },
     "audio": {
         "input_device_index": None,

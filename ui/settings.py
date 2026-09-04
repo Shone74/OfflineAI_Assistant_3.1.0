@@ -1457,6 +1457,26 @@ class VoiceSettingsTab(QWidget):
 
         main_layout.addWidget(tts_group)
 
+        # --- Wake Word section (Faza 7) ---
+        wake_group = QGroupBox("Wake Word")
+        wake_layout = QFormLayout(wake_group)
+
+        self._wake_enabled_chk = QCheckBox("Enable wake-word detection (\"Hey Jarvis\")")
+        self._wake_enabled_chk.setToolTip(
+            "Kada je omogućeno, asistent sluša wake frazu i pokreće glasovnu interakciju"
+        )
+        self._wake_enabled_chk.stateChanged.connect(self._on_wake_enabled_changed)
+        wake_layout.addRow(self._wake_enabled_chk)
+
+        self._wake_hotword_edit = QLineEdit()
+        self._wake_hotword_edit.setToolTip(
+            "Wake fraza (openwakeword labela, npr. 'hey_jarvis')"
+        )
+        self._wake_hotword_edit.editingFinished.connect(self._on_wake_hotword_changed)
+        wake_layout.addRow(QLabel("<b>Phrase</b>"), self._wake_hotword_edit)
+
+        main_layout.addWidget(wake_group)
+
         # --- Status line ---
         self._status_label = QLabel("")
         self._status_label.setStyleSheet("color: #8C9692; font-size: 11px;")
@@ -1529,6 +1549,15 @@ class VoiceSettingsTab(QWidget):
         self._tts_volume_slider.setValue(int(tts_cfg.get("volume", 1.0) * 100))
         self._tts_volume_slider.blockSignals(False)
         self._tts_volume_value.setText(f"{self._tts_volume_slider.value()}%")
+
+        # Wake word (Faza 7)
+        wake_cfg = config.get("voice.wake_word", {})
+        self._wake_enabled_chk.blockSignals(True)
+        self._wake_enabled_chk.setChecked(bool(wake_cfg.get("enabled", True)))
+        self._wake_enabled_chk.blockSignals(False)
+        self._wake_hotword_edit.blockSignals(True)
+        self._wake_hotword_edit.setText(str(wake_cfg.get("hotword", "hey_jarvis")))
+        self._wake_hotword_edit.blockSignals(False)
 
         self._update_status()
 
@@ -1756,6 +1785,37 @@ class VoiceSettingsTab(QWidget):
             self._event_bus.publish(
                 "CONFIG_CHANGED", {"key": "voice.tts.volume", "value": value / 100.0}
             )
+
+    # --- Wake Word handlers (Faza 7) ---
+    def _on_wake_enabled_changed(self, state: int) -> None:
+        enabled = state == Qt.CheckState.Checked
+        self._config.set("voice.wake_word.enabled", enabled)
+        if self._event_bus is not None:
+            self._event_bus.publish(
+                "CONFIG_CHANGED", {"key": "voice.wake_word.enabled", "value": enabled}
+            )
+        # Odma primeni na živi VoiceManager
+        if self._voice_manager is not None:
+            try:
+                if enabled:
+                    self._voice_manager.start_wake_word()
+                else:
+                    self._voice_manager.stop_wake_word()
+            except Exception:
+                pass
+
+    def _on_wake_hotword_changed(self) -> None:
+        hotword = self._wake_hotword_edit.text().strip() or "hey_jarvis"
+        self._config.set("voice.wake_word.hotword", hotword)
+        if self._event_bus is not None:
+            self._event_bus.publish(
+                "CONFIG_CHANGED", {"key": "voice.wake_word.hotword", "value": hotword}
+            )
+        # Napomena: promena fraze zahteva restart VoiceManager-a da bi
+        # provider ponovo kreiran sa novom labelom (dokumentovano ograničenje).
+        self._status_label.setText(
+            "Wake fraza sačuvana — primenjuje se posle ponovnog pokretanja aplikacije"
+        )
 
 
 class GenerationSettingsTab(QWidget):

@@ -22,7 +22,10 @@ class StubWakeWord(WakeWordProvider):
     """No-op detector — never fires (headless / CI safe)."""
 
     name = "stub"
-    hotword = "hey"
+
+    def __init__(self, hotword: str = "hey_jarvis") -> None:
+        self.hotword = hotword
+        self._callback: Callable[[], Any] | None = None
 
     @property
     def is_listening(self) -> bool:
@@ -60,11 +63,34 @@ class OpenWakeWord(WakeWordProvider):
     #: Maximum time (seconds) to wait for the detection thread to join.
     _JOIN_TIMEOUT: float = 2.0
 
-    def __init__(self, hotword: str = "hey", threshold: float | None = None) -> None:
+    def __init__(self, hotword: str = "hey_jarvis", threshold: float | None = None) -> None:
         from openwakeword import Model
 
         self.hotword = hotword
-        self._model = Model()
+        # Windows nema tflite-runtime wheels — koristimo ONNX modele
+        # (podrazumevana preuzimanja uključuju "hey_jarvis").
+        try:
+            self._model = Model(inference_framework="onnx")
+        except Exception:
+            # Starije verzije / drugi OS — fallback na default init
+            self._model = Model()
+        # Validiraj da model sadrži traženu labelu; ako ne — loguj, ne padaj.
+        try:
+            labels = list(getattr(self._model, "models", {}).keys())
+            if labels and hotword not in labels:
+                logger.warning(
+                    "Hotword %r nije medju modelima %s — koristi se prvi dostupan",
+                    hotword,
+                    labels,
+                )
+                if len(labels) == 1:
+                    self.hotword = labels[0]
+                else:
+                    # Postoji "hey_jarvis" medju predefinisanim; ako korisnik
+                    # trazi nepostojecu, vrati se na default.
+                    self.hotword = "hey_jarvis" if "hey_jarvis" in labels else labels[0]
+        except Exception:
+            pass
         self._threshold = threshold if threshold is not None else self._THRESHOLD
         self._running = False
         self._thread: threading.Thread | None = None
@@ -146,12 +172,20 @@ class OpenWakeWord(WakeWordProvider):
         logger.info("OpenWakeWord detection stopped")
 
 
-def create_wake_word(preferred: str = "openwakeword", hotword: str = "hey") -> WakeWordProvider:
-    """Return the best available wake-word provider, falling back to StubWakeWord."""
-    logger.info("Wake-word provider requested: %s", preferred)
+def create_wake_word(
+    preferred: str = "openwakeword",
+    hotword: str = "hey_jarvis",
+    threshold: float | None = None,
+) -> WakeWordProvider:
+    """Return the best available wake-word provider, falling back to StubWakeWord.
+
+    ``hotword`` default je "hey_jarvis" — openwakeword-ova predefinisana
+    "hey jarvis" fraza (specifikacija §1).
+    """
+    logger.info("Wake-word provider requested: %s (hotword=%s)", preferred, hotword)
     if preferred == "openwakeword":
         try:
-            return OpenWakeWord(hotword=hotword)
+            return OpenWakeWord(hotword=hotword, threshold=threshold)
         except Exception:
             logger.info("openwakeword unavailable, using stub")
-    return StubWakeWord()
+    return StubWakeWord(hotword=hotword)

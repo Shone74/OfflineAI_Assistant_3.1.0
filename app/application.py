@@ -519,7 +519,12 @@ class ApplicationManager:
             self._voice.audio_name,
         )
         if voice_cfg.get("enabled", True):
-            self._voice.start_wake_word()
+            # Faza 7: wake word poštuje voice.wake_word.enabled pod-podešavanje
+            wake_cfg = voice_cfg.get("wake_word", {})
+            if isinstance(wake_cfg, dict) and wake_cfg.get("enabled", True):
+                self._voice.start_wake_word()
+            else:
+                logger.info("Wake word disabled via voice.wake_word.enabled — not starting")
 
         self._window = MainWindow(
             config=self._config,

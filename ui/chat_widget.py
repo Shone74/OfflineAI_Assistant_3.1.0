@@ -108,6 +108,7 @@ class ChatWidget(QWidget):
     new_chat_requested = Signal()
     search_requested = Signal(str)
     message_deleted = Signal(int)
+    automatic_listening_toggled = Signal(bool)
 
     def __init__(self) -> None:
         super().__init__()
@@ -349,7 +350,35 @@ class ChatWidget(QWidget):
         self._play_btn.setVisible(False)
         layout.addWidget(self._play_btn)
 
+        # Automatic Listening (continuous conversation) — korisnički toggle.
+        # Jasno komunicira stanje: "Automatic Listening" / "Automatic Listening: ON".
+        self._auto_listen_btn = QPushButton("Automatic Listening")
+        self._auto_listen_btn.setObjectName("capability_button")
+        self._auto_listen_btn.setToolTip(
+            "Continuous conversation: slušaj → transkribuj → odgovori → "
+            "izgovori → slušaj ponovo (bez pritiskanja mikrofona)"
+        )
+        self._auto_listen_btn.setAccessibleName("Automatic Listening toggle")
+        self._auto_listen_btn.setCheckable(True)
+        self._auto_listen_btn.clicked.connect(self._on_auto_listen_clicked)
+        self._auto_listen_btn.setMinimumWidth(140)
+        self._auto_listen_btn.setFixedHeight(38)
+        layout.addWidget(self._auto_listen_btn)
+
         return layout
+
+    def _on_auto_listen_clicked(self, checked: bool) -> None:
+        self.automatic_listening_toggled.emit(bool(checked))
+
+    def set_automatic_listening_ui(self, enabled: bool) -> None:
+        """Ažurira Automatic Listening dugme da odražava stvarno stanje."""
+        self._auto_listen_btn.blockSignals(True)
+        self._auto_listen_btn.setChecked(enabled)
+        if enabled:
+            self._auto_listen_btn.setText("Automatic Listening: ON")
+        else:
+            self._auto_listen_btn.setText("Automatic Listening")
+        self._auto_listen_btn.blockSignals(False)
 
     # ------------------------------------------------------------------ #
     def _on_text_changed(self) -> None:

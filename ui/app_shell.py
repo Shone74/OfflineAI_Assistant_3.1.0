@@ -420,4 +420,11 @@ class AppShell(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._unsubscribe_events()
+        # Faza 7: zaustavi Automatic Listening + aktivnu generaciju
+        coordinator = getattr(self, "_chat_coordinator", None)
+        if coordinator is not None:
+            try:
+                coordinator.shutdown()
+            except Exception:
+                pass
         super().closeEvent(event)

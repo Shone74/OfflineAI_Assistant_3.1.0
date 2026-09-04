@@ -156,10 +156,11 @@ class VoiceManager:
         self._event_bus = event_bus
         self._stt: STTProvider = stt or create_stt()
         self._tts: TTSProvider = tts or create_tts()
-        self._wake: WakeWordProvider = wake or create_wake_word()
+        self._config: ConfigManager | None = config if isinstance(config, ConfigManager) else None
+        # wake word se kreira NAKON _config (čita voice.wake_word iz configa)
+        self._wake: WakeWordProvider = wake or self._create_wake_word_from_config()
         self._record_fn = record_fn
         self._audio: AudioManager = audio_manager or create_audio()
-        self._config: ConfigManager | None = config if isinstance(config, ConfigManager) else None
         self._config_sub_id: str | None = None
         self._voice_enabled_sub_id: str | None = None
         self._pending_stt_config: dict[str, Any] | None = None
@@ -167,6 +168,16 @@ class VoiceManager:
         self._pending_startup_errors: list[dict[str, Any]] = []
         self._listening = False
         self._initialized = False
+        # --- Wake word refractory (sprečava burst trigera iz jedne fraze) ---
+        self._wake_cooldown_active = False
+        # --- Echo zaštita: wake word ugašen tokom TTS-a (§8) ---
+        self._wake_suppressed_for_tts = False
+        # --- Automatic Listening session state (Faza 7) ---
+        self._auto_session = False
+        self._auto_watchdog = None
+        self._auto_buffer_marker = 0
+        self._auto_last_change_ms = 0
+        self._auto_silence_ms = 3000
         # --- Phase 2C REC/STOP/PROCESSING lifecycle ---
         self._state: VoiceState = VoiceState.IDLE
         self._worker: _VoiceTranscribeWorker | None = None
@@ -193,6 +204,33 @@ class VoiceManager:
             self._config_sub_id = self._event_bus.subscribe(
                 "CONFIG_CHANGED", self._on_config_changed
             )
+
+    def _create_wake_word_from_config(self) -> WakeWordProvider:
+        """Kreiraj wake-word provider iz konfiguracije.
+
+        Config šema (voice.wake_word):
+            enabled  — bool (default True; koristi application bootstrap)
+            provider — "openwakeword" | "stub" (default "openwakeword")
+            hotword  — fraza (default "hey_jarvis")
+            threshold — score prag 0..1 (default 0.5)
+
+        "hey_jarvis" je openwakeword-ova predefinisana "hey jarvis" labela —
+        default fraza za ovaj projekat (specifikacija §1).
+        """
+
+        hotword = "hey_jarvis"
+        provider = "openwakeword"
+        threshold = 0.5
+        if self._config is not None:
+            try:
+                wake_cfg = self._config.get("voice.wake_word", {})
+                if isinstance(wake_cfg, dict):
+                    hotword = wake_cfg.get("hotword", hotword)
+                    provider = wake_cfg.get("provider", provider)
+                    threshold = float(wake_cfg.get("threshold", threshold))
+            except Exception:
+                logger.debug("wake-word config read failed — using defaults")
+        return create_wake_word(preferred=provider, hotword=hotword, threshold=threshold)
 
     def _unsubscribe_from_config(self) -> None:
         """Remove the CONFIG_CHANGED subscription (idempotent)."""
@@ -743,6 +781,7 @@ class VoiceManager:
         """
         if self._state != VoiceState.RECORDING:
             return False
+        self._stop_auto_watchdog()
         self._state = VoiceState.PROCESSING
         self._listening = False
         try:
@@ -759,6 +798,74 @@ class VoiceManager:
             logger.debug("failed to persist last recording", exc_info=True)
         self._run_transcription(pcm, sr, self._on_transcription_result, self._on_transcription_error)
         return True
+
+    # ------------------------------------------------------------------ #
+    # Automatic Listening (Faza 7) — auto sesije sa silence watchdog-om
+    # ------------------------------------------------------------------ #
+
+    def begin_auto_recording(self, silence_timeout_s: float = 3.0) -> bool:
+        """Započni AUTOMATSKU sesiju snimanja (Automatic Listening).
+
+        Razlika od ručne sesije: pokreće se iz VoiceManager-a (ne klikom) i
+        nosi silence watchdog — kada korisnik prestane da govori (nema novog
+        audio chunk-a sa energijom ~tišina), sesija se sama finalizuje kao
+        da je korisnik kliknuo STOP (stop_and_transcribe).
+
+        Watchdog je energy-based po buffer rastu: dok buffer raste, korisnik
+        verovatno govori; watchdog proverava svakih 500 ms — ako je ukupan
+        buffer nepromenjen duže od silence_timeout_s, smatra se kraj izjave.
+        (Puna RMS VAD detekcija je buduća nadogradnja — v. docs/current_status.)
+        """
+        started = self.begin_recording()
+        if not started:
+            return False
+        self._auto_session = True
+        self._auto_buffer_marker = 0
+        try:
+            from PySide6.QtCore import QTimer
+
+            self._auto_watchdog = QTimer(self)
+            self._auto_watchdog.setInterval(500)
+            self._auto_watchdog.timeout.connect(self._on_auto_watchdog_tick)
+            self._auto_watchdog.start()
+            self._auto_silence_ms = int(silence_timeout_s * 1000)
+            self._auto_last_change_ms = 0
+            logger.info("Auto listening session started (silence timeout %.1fs)", silence_timeout_s)
+        except Exception:
+            logger.debug("QTimer unavailable — auto watchdog disabled (headless test?)")
+            self._auto_watchdog = None
+        return True
+
+    def _stop_auto_watchdog(self) -> None:
+        watchdog = getattr(self, "_auto_watchdog", None)
+        if watchdog is not None:
+            try:
+                watchdog.stop()
+                watchdog.deleteLater()
+            except Exception:
+                pass
+        self._auto_watchdog = None
+        self._auto_session = False
+
+    def _on_auto_watchdog_tick(self) -> None:
+        """Watchdog tick: detektuj tišinu preko rasta audio buffer-a."""
+        if self._state != VoiceState.RECORDING or not getattr(self, "_auto_session", False):
+            self._stop_auto_watchdog()
+            return
+        try:
+            marker = self._audio.buffer_size()
+        except Exception:
+            marker = getattr(self, "_auto_buffer_marker", 0)
+        if marker != getattr(self, "_auto_buffer_marker", -1):
+            # Buffer raste — korisnik govori (ili buka); resetuj tajmer tišine.
+            self._auto_buffer_marker = marker
+            self._auto_last_change_ms = 0
+            return
+        self._auto_last_change_ms += 500
+        if self._auto_last_change_ms >= self._auto_silence_ms:
+            logger.info("Auto listening: silence detected — finalizing utterance")
+            self._stop_auto_watchdog()
+            self.stop_and_transcribe()
 
     def _persist_recording(self, pcm: bytes, sample_rate: int) -> None:
         """Store the latest capture as a local WAV for playback/diagnostics."""
@@ -882,6 +989,12 @@ class VoiceManager:
         if self._state not in (VoiceState.IDLE, VoiceState.SPEAKING):
             logger.debug("speak() rejected — state=%s (not IDLE or SPEAKING)", self._state.value)
             return
+        # Echo zaštita (Faza 7, specifikacija §8): tokom TTS izlaza mikrofon
+        # ne sme čuti sopstveni govor — polu-dupleks pristup. Wake word se
+        # gasi na početku speak() i restartuje po završetku (_on_speak_finished).
+        # (Zvuk TTS-a iz zvučnika može okinuti wake word / ući u STT.)
+        self._wake_suppressed_for_tts = True
+        self.stop_wake_word()
         self._state = VoiceState.SPEAKING
         self._event_bus.publish("VOICE_PLAY_START", {"text": text})
         self._tts_generation += 1
@@ -914,6 +1027,11 @@ class VoiceManager:
         self._check_pending_tts_config()
         self._check_pending_stt_config()
         self._event_bus.publish("VOICE_PLAY_DONE", {})
+        # Echo zaštita (Faza 7): TTS završen → vrati wake word (ako je bio
+        # ugašen zbog TTS-a i ako je voice enabled u configu).
+        if getattr(self, "_wake_suppressed_for_tts", False):
+            self._wake_suppressed_for_tts = False
+            self._restart_wake_word_if_enabled()
 
     def _on_speak_error(self, message: str, generation: int = 0) -> None:
         """Main-thread slot: publish VOICE_ERROR after TTS failure."""
@@ -930,6 +1048,9 @@ class VoiceManager:
         self._check_pending_stt_config()
         self._check_pending_tts_config()
         self._event_bus.publish("VOICE_ERROR", {"error": message})
+        if getattr(self, "_wake_suppressed_for_tts", False):
+            self._wake_suppressed_for_tts = False
+            self._restart_wake_word_if_enabled()
 
     def start_wake_word(self) -> None:
         """Start wake-word detection (if a usable provider is available).
@@ -938,6 +1059,10 @@ class VoiceManager:
         provider is available (no real backend installed), ``start`` is a no-op
         and detection simply never fires.
         """
+        if self._wake_cooldown_active:
+            # Refractory: nedavni trigger — ne restartuj detektor odmah da
+            # bismo sprečili burst ponovljenih detekcija iste izgovorene fraze.
+            self._wake_cooldown_active = False
         try:
             self._wake.start(self._on_wake_word_detected)
             logger.info("Wake-word detection started (%s)", self._wake.name)
@@ -945,8 +1070,37 @@ class VoiceManager:
             logger.warning("Wake-word start failed: %s", exc)
 
     def _on_wake_word_detected(self) -> None:
-        """Publish WAKE_WORD_DETECTED so other components can react."""
+        """Publish WAKE_WORD_DETECTED — thread-safe (marshalled to owner thread).
+
+        Detektor poziva ovaj callback sa svog pozadinskog thread-a. Direktan
+        EventBus publish bi subscribere (Qt widgete) izvršavao na tom thread-u
+        — kršeći Qt thread-affinity. QMetaObject marshalling prebacuje poziv
+        na thread vlasnika VoiceManager-a (GUI).
+        """
+        if self._wake_cooldown_active:
+            logger.debug("Wake word trigger suppressed (refractory)")
+            return
+        self._wake_cooldown_active = True
+        try:
+            from PySide6.QtCore import QMetaObject, Qt
+
+            QMetaObject.invokeMethod(
+                self, "_emitWakeWordDetected", Qt.ConnectionType.QueuedConnection
+            )
+        except Exception:
+            # Fallback: direktan publish (non-Qt okruženje/test bez QApplication)
+            self._emitWakeWordDetected()
+
+    def _emitWakeWordDetected(self) -> None:
+        """GUI-thread slot: publish WAKE_WORD_DETECTED + refractory reset."""
         self._event_bus.publish("WAKE_WORD_DETECTED", {})
+        # Refractory period: 2 s — jedna izgovorena fraza = jedan trigger.
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(2000, self._reset_wake_cooldown)
+
+    def _reset_wake_cooldown(self) -> None:
+        self._wake_cooldown_active = False
 
     def stop_wake_word(self) -> None:
         try:
@@ -959,14 +1113,19 @@ class VoiceManager:
 
         Called after a recording session ends (success or failure) so the
         system returns to hands-free wake-word listening rather than requiring
-        a manual reclick.  When voice is disabled in config or the VoiceManager
-        was not configured with a ConfigManager, this is a no-op.
+        a manual reclick.  Respects BOTH switches: ``voice.enabled`` (master)
+        and ``voice.wake_word.enabled`` (pod-podešavanje, Faza 7).
+        When voice is disabled in config or the VoiceManager was not
+        configured with a ConfigManager, this is a no-op.
         """
         if self._state != VoiceState.IDLE:
             return
         if self._config is not None:
             voice_cfg = self._config.get("voice", {})
             if not voice_cfg.get("enabled", True):
+                return
+            wake_cfg = voice_cfg.get("wake_word", {})
+            if isinstance(wake_cfg, dict) and not wake_cfg.get("enabled", True):
                 return
         self.start_wake_word()
 
@@ -976,6 +1135,8 @@ class VoiceManager:
         self._pending_tts_config = None
         self._pending_startup_errors.clear()
         self._unsubscribe_from_config()
+        # Automatic Listening watchdog mora stati PRE ostalih resursa (§11/§14)
+        self._stop_auto_watchdog()
         self.stop_listening()
         self.stop_wake_word()
         # Invalidate all pending worker callbacks by bumping generation

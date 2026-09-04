@@ -16,6 +16,7 @@ from ui.app_shell import AppShell
 from ui.assistant_hub import AssistantHub
 from ui.automation_dashboard import AutomationDashboard
 from ui.capabilities_page import CapabilitiesPage
+from ui.chat_voice_coordinator import ChatVoiceCoordinator
 from ui.chat_widget import ChatWidget
 from ui.home_page import HomePage
 from ui.knowledge_dashboard import KnowledgeDashboard
@@ -37,6 +38,17 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
     automation_manager = manager._automation
 
     chat = ChatWidget()
+    # Chat + Voice + Assistant povezivanje (Faza 7): send/voice signali i
+    # VOICE_* eventi imaju konzumenta unutar AppShell-a; Automatic Listening
+    # toggle radi kroz koordinatora.
+    coordinator = ChatVoiceCoordinator(
+        chat=chat,
+        assistant=assistant,
+        voice_manager=voice,
+        event_bus=event_bus,
+    )
+    coordinator.wire()
+    manager._chat_coordinator = coordinator
     memory = MemoryPage(assistant=assistant)
     knowledge = KnowledgeDashboard(navigator=navigator)
     models = ModelsPage(assistant=assistant, model_manager=manager._model_manager, event_bus=event_bus)
@@ -133,8 +145,19 @@ def main() -> int:
         memory_count=memory_count,
         event_bus=manager._event_bus,
     )
+    shell._chat_coordinator = getattr(manager, "_chat_coordinator", None)
     shell_holder["shell"] = shell
     shell.show()
+
+    def _on_about_to_quit() -> None:
+        coordinator = getattr(manager, "_chat_coordinator", None)
+        if coordinator is not None:
+            try:
+                coordinator.shutdown()
+            except Exception:
+                pass
+
+    app.aboutToQuit.connect(_on_about_to_quit)
 
     return app.exec()
 
