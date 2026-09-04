@@ -232,7 +232,7 @@ class ApplicationManager:
         result = dialog.exec()
         return result != 0
 
-    def start(self) -> int:
+    def start(self, show_main_window: bool = True) -> int:
         if self._started:
             logger.warning("Application is already running")
             return 0
@@ -532,7 +532,8 @@ class ApplicationManager:
             automation_manager=self._automation,
         )
         self._voice.flush_pending_startup_errors()
-        self._window.show()
+        if show_main_window:
+            self._window.show()
 
         self._assistant.start()
         self._event_bus.subscribe("NEW_CHAT_REQUESTED", self._on_new_chat_requested)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 
 from app.application import ApplicationManager
 from ui.app_shell import AppShell
@@ -28,7 +28,7 @@ from ui.workflow_builder import WorkflowBuilder
 from ui.settings import SettingsDialog
 
 
-def _build_pages(manager: ApplicationManager) -> list[tuple[str, QWidget]]:
+def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWidget]]:
     assistant = manager._assistant
     config = manager._config
     event_bus = manager._event_bus
@@ -76,7 +76,9 @@ def _build_pages(manager: ApplicationManager) -> list[tuple[str, QWidget]]:
 
 def main() -> int:
     manager = ApplicationManager()
-    exit_code = manager.start()
+    # Ne prikazuj legacy MainWindow — AppShell (ispod) je primarni prozor.
+    # Ako je first-run, wizard/welcome dijalog i dalje se prikazuje unutar start().
+    exit_code = manager.start(show_main_window=False)
     if exit_code != 0:
         return exit_code
 
@@ -87,8 +89,10 @@ def main() -> int:
     config = manager._config
     assistant_name = config.get("app.name", "Assistant")
 
+    shell_holder: dict[str, AppShell] = {}
+
     def navigator(route: str) -> None:
-        shell._navigate(route)
+        shell_holder["shell"]._navigate(route)
 
     home = HomePage(
         theme=theme,
@@ -98,7 +102,7 @@ def main() -> int:
     )
     hub = AssistantHub(assistant=assistant, navigator=navigator)
 
-    pages = _build_pages(manager)
+    pages = _build_pages(manager, navigator)
     all_pages = [("Home", home), ("Assistant Hub", hub), *pages]
 
     model_name = getattr(assistant, "model_name", None) or "No model loaded"
@@ -129,12 +133,8 @@ def main() -> int:
         capabilities=capabilities,
         memory_count=memory_count,
     )
+    shell_holder["shell"] = shell
     shell.show()
-
-    old_window = getattr(manager, "_window", None)
-    if old_window is not None:
-        old_window.close()
-        manager._window = None
 
     return app.exec()
 

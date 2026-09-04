@@ -1,3 +1,4 @@
+# Core dependencies (verified on Python 3.11.9 — see docs/environment.md)
 PySide6>=6.6
 llama-cpp-python>=0.3.0
 scipy>=1.13.0
@@ -6,3 +7,14 @@ psutil>=5.9.0
 sounddevice>=0.5.0
 faster-whisper>=1.0.0
 nvidia-ml-py3>=12.465.0; platform_system == 'Windows'
+
+# Used by installer/hardware detection and model downloader
+requests>=2.31.0
+pywin32>=306; platform_system == 'Windows'
+
+# Optional extensions (app runs with stub fallbacks without them):
+#   pip install -r requirements.txt --extra-index-url https://pypi.org/simple
+#   voice:    openwakeword      (wake-word detection; stub fallback)
+#   vector:   faiss-cpu, sentence-transformers   (vector memory; kNN fallback)
+#   scheduler: croniter          (cron workflows; interval fallback)
+#   dev:      pytest, pytest-qt, ruff, mypy      (see requirements-dev.txt)
