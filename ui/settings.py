@@ -2281,8 +2281,8 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(QLabel("<b>Theme</b>"))
         self._theme_combo = QComboBox()
-        self._theme_combo.addItems(["dark", "light", "cyber", "grey_emerald"])
-        self._theme_combo.setCurrentText(self._config.get("ui.theme", "dark"))
+        self._theme_combo.addItems(["grey_emerald", "installer"])
+        self._theme_combo.setCurrentText(self._config.get("ui.theme", "grey_emerald"))
         self._theme_combo.currentTextChanged.connect(self._on_theme_changed)
         layout.addRow(self._theme_combo)
 

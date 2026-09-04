@@ -1,7 +1,7 @@
 # Current Status — Redizajn Offline AI Assistant
 
-**Poslednje ažuriranje:** 2026-09-04
-**Trenutna faza:** FAZA 0 — Priprema
+**Poslednje ažuriranje:** 2026-09-04 (Faza 1 završena)
+**Trenutna faza:** FAZA 2 — Design system
 **Plan:** `docs/project_plan.md`
 
 Legenda statusa: ⬜ Nije počelo · 🟡 U toku · ✅ Završeno · ⛔ Blokirano · ➖ N/A
@@ -12,8 +12,8 @@ Legenda statusa: ⬜ Nije počelo · 🟡 U toku · ✅ Završeno · ⛔ Blokira
 
 | Faza | Naziv | Koraci | Završeno | % |
 |---|---|---|---|---|
-| 0 | Priprema i sigurnosna mreža | 5 | 3 | 60% |
-| 1 | Stabilizacija launchera | 5 | 0 | 0% |
+| 0 | Priprema i sigurnosna mreža | 5 | 5 | 100% ✅ |
+| 1 | Stabilizacija launchera | 5 | 5 | 100% ✅ |
 | 2 | Design system | 4 | 0 | 0% |
 | 3 | Redizajn AppShell | 6 | 0 | 0% |
 | 4 | Migracija stranica | 11 | 0 | 0% |
@@ -22,27 +22,33 @@ Legenda statusa: ⬜ Nije počelo · 🟡 U toku · ✅ Završeno · ⛔ Blokira
 | 7 | Voice (opciono) | 3 | 0 | 0% |
 | 8 | Čišćenje i završetak | 5 | 0 | 0% |
 
-**Ukupno: 3 / 47 koraka (6%)**
+**Ukupno: 10 / 47 koraka (21%)**
+
+**Baseline: 36/36 testova prolazi** (docs/baseline/baseline_2026-09-04.txt)
 
 ---
 
-## FAZA 0 — Priprema i sigurnosna mreža
+## FAZA 0 — Priprema i sigurnosna mreža ✅
 
-- ✅ **0.2 Zavisnosti u Python 3.11** — `llama-cpp-python 0.3.35`, `PySide6 6.11.1`, `pytest 9.1.1`, `faster-whisper`, `sounddevice`, `pyttsx3`, `requests`, `pywin32` prisutni. Nedostaju `scipy`, `nvidia-ml-py3` (za 0.2 cleanup pre testa).
-- ✅ **0.4 Verifikacija NameError buga** — Potvrđeno: `app/application_final.py:43,50,51` koristi `navigator` definisan tek u `main()` (linija 90) → `NameError: name 'navigator' is not defined` pri svakom pokretanju `run.py`. Launcher je potvrđeno pokvaren. Rešenje planirano u 1.1.
-- ✅ **0.5 Provera settings.json** — `%LOCALAPPDATA%\OfflineAI\config\settings.json` postoji. Pronađene loše vrednosti: `models_dir: "E:/models"` (radi, ali neusklađeno sa novim rasporedom), `model_search_paths` samo AppData, `model_name: "qwen-7b"` (ne odgovara nijednom modelu), `n_ctx: 512` (premalo), `max_tokens: 204` (premalo). Korekcije planirane u 6.1/6.3.
-- ⬜ 0.1 Git repozitorijum
-- ⬜ 0.3 Baseline test suite
+- ✅ **0.1 Git repozitorijum** — `git init`, `.gitignore` (bez GGUF/keševa), initial commit.
+- ✅ **0.2 Zavisnosti** — `scipy` + `nvidia-ml-py3` instalirani; svi importi rade; `pip check` čist.
+- ✅ **0.3 Baseline test suite** — `tests/conftest.py` (OFFLINE_AI_TEST_MODE + offscreen) + `tests/test_baseline_smoke.py` (23 nova testa: core, ai, memory, knowledge, tools, security, agent, database, UI). **36/36 prolazi.** pytest-qt instaliran. Baseline snimljen.
+- ✅ **0.4 Verifikacija NameError buga** — Potvrđen: `app/application_final.py:43,50,51` → `navigator` van scope-a.
+- ✅ **0.5 Provera settings.json** — Identifikovane loše vrednosti (`model_name: "qwen-7b"`, `n_ctx: 512`, `max_tokens: 204`) — korekcija u 6.3.
+
+Napomene iz Faze 0: `OLLAMA_MODELS=E:\models` već postavljen globalno (Ollama blob-ovi se automatski otkrivaju).
 
 ---
 
-## FAZA 1 — Stabilizacija launchera
+## FAZA 1 — Stabilizacija launchera ✅
 
-- ⬜ 1.1 Popravka `application_final.py` NameError
-- ⬜ 1.2 Uklanjanje double-boot obrasca
-- ⬜ 1.3 Ujednačavanje entry pointa
-- ⬜ 1.4 Usklađivanje requirements.txt
-- ⬜ 1.5 Python verzija >=3.11
+- ✅ **1.1 NameError popravka** — `_build_pages(manager, navigator)` sada prima navigator kao argument; `main()` koristi `shell_holder` dict (navigator defnicija pre shell kreiranja). Verifikovano: headless `_build_pages` gradi svih 11 stranica.
+- ✅ **1.2 Double-boot uklonjen** — `ApplicationManager.start(show_main_window: bool = True)`; finalni bootstrap poziva `start(show_main_window=False)` → nema treperenja starog MainWindow-a; wizard/welcome tok netaknut.
+- ✅ **1.3 Entry point ujednačen** — pyproject script: `offline-ai-final = "app.application_final:main"` (bio `app.application:main`).
+- ✅ **1.4 requirements.txt** — dodati `requests`, `pywin32`; `requirements-dev.txt` (pytest, pytest-qt, ruff, mypy); optional extras dokumentovani (voice/vector/scheduler).
+- ✅ **1.5 Python verzija** — `requires-python = ">=3.11"`; ruff/mypy target `py311`; uklonjen nepostojeći `qt_api` pytest config.
+
+**E2E verifikacija Faze 1:** `python run.py` (GUI) pokreće aplikaciju, otkriva 13 modela, učitava stvarni model u pozadini, živi 20s+ bez crash-a. AppShell se prikazuje kao primarni prozor.
 
 ---
 
@@ -122,17 +128,17 @@ Legenda statusa: ⬜ Nije počelo · 🟡 U toku · ✅ Završeno · ⛔ Blokira
 
 | Datum | Faza/Korak | Promena |
 |---|---|---|
-| 2026-09-04 | — | Analiza projekta završena; kreirani: project_plan.md, current_status.md, design_system.md, models_report.md, environment.md; kopirani modeli u `models/llm/` (Qwen2.5-Coder-7B 4.36GB, Phi-4-mini 3.08GB) |
-| 2026-09-04 | 0.2 | Verifikovan Python 3.11.9 env — sve ključne zavisnosti prisutne |
-| 2026-09-04 | 0.4 | Potvrđen NameError bug u launcheru (application_final.py:43,50,51) |
-| 2026-09-04 | 0.5 | Analiziran settings.json — identifikovane loše vrednosti (models_dir, model_name, n_ctx, max_tokens) |
+| 2026-09-04 | — | Analiza projekta završena; kreirani: project_plan.md, current_status.md, design_system.md, models_report.md, environment.md, qa_checklist.md; kopirani modeli u `models/llm/` (Qwen2.5-Coder-7B 4.36GB, Phi-4-mini 3.08GB) |
+| 2026-09-04 | 0.1–0.5 | FAZA 0 završena: git init (161 fajl), baseline suite 36/36 green, zavisnosti instalirane |
+| 2026-09-04 | 1.1–1.5 | FAZA 1 završena: NameError popravljen, double-boot uklonjen, entry point ujednačen, requirements usklađeni, py>=3.11; **run.py sada radi E2E** (GUI start verifikovan 20s+, model load u pozadini) |
 
 ---
 
-## Poznati otvoreni problemi (van plana koraka)
+## Poznati otvoreni problemi
 
-1. **llama-cpp-python nije dostupan za Python 3.14** — razvoj/testovi moraju na 3.11.9 (vidi environment.md).
-2. **Vision multimodalna inferencija nije implementirana** u chat pipeline-u (mmproj se klasifikuje kao PROJECTOR, ne koristi se). Qwen2.5-VL iz E:\models se NE koristi.
-3. **MM Projekat u PyInstalleru** — installer/ ima generatore; nisu testirani sa novim UI-jem (odloženo do faze 8).
-4. **`ai/max_tokens` = 204 trenutno seče duge odgovore** — ispravka u 6.3.
+1. **llama-cpp-python CPU-only na 3.11** — PyPI wheel 0.3.35 nema CUDA (`supports_gpu_offload: False`). Rešenje za Fazom 6: custom CUDA wheel (cmake -DGGML_CUDA=ON) ili prebuilt wheel. RTX 3080 trenutno neiskorišćena u inferenci.
+2. **llama-cpp-python nije dostupan za Python 3.14** — razvoj ostaje na 3.11.9 (vidi environment.md).
+3. **Vision multimodalna inferencija nije implementirana** — Qwen2.5-VL iz E:\models se NE koristi.
+4. **`ai/max_tokens` = 204 i `n_ctx` = 512** — ispravka u 6.3.
 5. **Dupliran konfig mehanizam** (settings.json + DB settings tabela) — ConfigManager ostaje primaran (faza 8.1).
+6. **Legacy MainWindow (1591 lin.)** — i dalje se kreira (ne pokazuje) u start(); puna migracija funkcionalnosti u Fazi 4, uklanjanje u 8.1.
