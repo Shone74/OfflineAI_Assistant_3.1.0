@@ -1,4 +1,12 @@
-"""Home / status hub page for the final application."""
+"""Home / status hub page — prema workspace dizajnu.
+
+Koristi design komponente (ui/design) — bez hardkodiranih boja.
+Layout po dizajnu:
+- "Your Assistant" naslov + status
+- Assistant hero kartica (✦ ime + status + Start Conversation primary dugme)
+- "Assistant Snapshot" grid 2×2 (Identity, AI Engine, Capabilities, Privacy)
+- "Quick Actions" grid 2×2 (Chat, Memory, Knowledge, Capabilities)
+"""
 
 from __future__ import annotations
 
@@ -16,33 +24,80 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.design.components import Card, make_primary_button, make_section_title
 from ui.theme_manager import ThemeManager
 
 
-class StatusCard(QFrame):
-    """Reusable status card."""
+class StatusCard(Card):
+    """Status kartica (#card) sa title/value/detail labelima."""
 
     def __init__(self, title: str, value: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFrameShape(QFrame.StyledPanel)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
+        self._title_label = QLabel(title.upper())
+        self._title_label.setObjectName("card_title")
+        self._value_label = QLabel(value)
+        self._value_label.setObjectName("card_value")
+        self._value_label.setWordWrap(True)
 
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: #8C9692; font-size: 9pt; font-weight: 600; text-transform: uppercase;")
-        value_label = QLabel(value)
-        value_label.setStyleSheet("color: #EDF3F0; font-size: 11pt; font-weight: 600;")
-        value_label.setWordWrap(True)
+        self.card_layout.addWidget(self._title_label)
+        self.card_layout.addWidget(self._value_label)
 
-        layout.addWidget(title_label)
-        layout.addWidget(value_label)
-        self.setStyleSheet(
-            "QFrame { background-color: #1C2221; border: 1px solid #29302E; border-radius: 10px; }"
-        )
+    def set_value(self, text: str) -> None:
+        self._value_label.setText(text)
+
+    @property
+    def value_label(self) -> QLabel:
+        return self._value_label
+
+
+class AssistantHeroCard(Card):
+    """Hero kartica asistenta: ✦ ime, opis, status + Start Conversation."""
+
+    def __init__(
+        self,
+        assistant_name: str,
+        on_start_conversation=None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("assistant_card")
+        self.card_layout.setContentsMargins(24, 20, 24, 20)
+        self.card_layout.setSpacing(8)
+
+        icon = QLabel("✦")
+        icon.setObjectName("assistant_name")
+        icon.setStyleSheet("font-size: 30pt; background: transparent;")
+        self.card_layout.addWidget(icon)
+
+        self._name_label = QLabel(assistant_name)
+        self._name_label.setObjectName("assistant_name")
+        self.card_layout.addWidget(self._name_label)
+
+        self._desc_label = QLabel("Your Personal AI Assistant")
+        self._desc_label.setObjectName("sidebar_subtitle")
+        self.card_layout.addWidget(self._desc_label)
+
+        self._status_label = QLabel("● Ready   🔒 Local AI")
+        self._status_label.setObjectName("status_local")
+        self._status_label.setWordWrap(True)
+        self.card_layout.addWidget(self._status_label)
+
+        self.card_layout.addSpacing(6)
+
+        if on_start_conversation is not None:
+            btn = make_primary_button("Start Conversation")
+            btn.clicked.connect(on_start_conversation)
+            self.card_layout.addWidget(btn)
+            self.card_layout.setAlignment(btn, Qt.AlignmentFlag.AlignLeft)
+
+        self.card_layout.addStretch()
+
+    def set_status(self, ready: bool) -> None:
+        self._status_label.setText("● Ready   🔒 Local AI" if ready else "○ No model   🔒 Local AI")
 
 
 class HomePage(QWidget):
-    """Application status hub."""
+    """Application status hub po workspace dizajnu."""
 
     def __init__(
         self,
@@ -65,44 +120,42 @@ class HomePage(QWidget):
         layout.setContentsMargins(32, 28, 32, 28)
         layout.setSpacing(18)
 
-        header = QHBoxLayout()
         title = QLabel("Your Assistant")
-        title.setStyleSheet("font-size: 22pt; font-weight: 600;")
+        title.setObjectName("page_title")
         subtitle = QLabel(
-            "This is your personal AI workspace. Everything here adapts to the way you use your assistant."
+            "This is your personal AI workspace. "
+            "Everything here adapts to the way you use your assistant."
         )
-        subtitle.setStyleSheet("color: #8C9692; font-size: 10pt;")
-        header.addWidget(title)
-        header.addWidget(subtitle)
-        header.addStretch()
-        layout.addLayout(header)
+        subtitle.setObjectName("page_subtitle")
+        subtitle.setWordWrap(True)
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
 
-        status_row = QHBoxLayout()
-        status = QLabel("● Ready     🔒 Local AI")
-        status.setStyleSheet("color: #27C48A; font-size: 10pt; font-weight: 600;")
-        status_row.addWidget(status)
-        status_row.addStretch()
-        layout.addLayout(status_row)
+        # Hero kartica
+        self._hero = AssistantHeroCard(
+            assistant_name=self._assistant_name,
+            on_start_conversation=lambda: self._open("Chat"),
+        )
+        layout.addWidget(self._hero)
 
-        cards = QGridLayout()
-        cards.setSpacing(12)
+        # Assistant Snapshot grid
+        layout.addWidget(make_section_title("Assistant Snapshot"))
+        snapshot = QGridLayout()
+        snapshot.setSpacing(12)
 
         self._ai_card = StatusCard("AI Engine", "No model loaded")
         self._system_card = StatusCard("System", "Checking…")
         self._memory_card = StatusCard("Memory", "No conversations")
         self._privacy_card = StatusCard("Privacy", "Local processing · Local data")
 
-        cards.addWidget(self._ai_card, 0, 0)
-        cards.addWidget(self._system_card, 0, 1)
-        cards.addWidget(self._memory_card, 1, 0)
-        cards.addWidget(self._privacy_card, 1, 1)
-        layout.addLayout(cards)
+        snapshot.addWidget(self._ai_card, 0, 0)
+        snapshot.addWidget(self._system_card, 0, 1)
+        snapshot.addWidget(self._memory_card, 1, 0)
+        snapshot.addWidget(self._privacy_card, 1, 1)
+        layout.addLayout(snapshot)
 
-        quick = QVBoxLayout()
-        quick_title = QLabel("Quick Actions")
-        quick_title.setStyleSheet("font-size: 12pt; font-weight: 600;")
-        quick.addWidget(quick_title)
-
+        # Quick Actions grid
+        layout.addWidget(make_section_title("Quick Actions"))
         quick_grid = QGridLayout()
         quick_grid.setSpacing(12)
 
@@ -113,32 +166,23 @@ class HomePage(QWidget):
             ("🧩 Capabilities", "Choose what your assistant can do.", "Capabilities"),
         ]
         for idx, (title_text, desc_text, route) in enumerate(actions):
-            card = QFrame()
-            card.setFrameShape(QFrame.StyledPanel)
-            card.setStyleSheet(
-                "QFrame { background-color: #1C2221; border: 1px solid #29302E; border-radius: 10px; }"
-            )
-            c_layout = QVBoxLayout(card)
-            c_layout.setContentsMargins(16, 14, 16, 14)
+            card = Card()
             t = QLabel(title_text)
-            t.setStyleSheet("font-size: 11pt; font-weight: 600;")
+            t.setObjectName("card_value")
             d = QLabel(desc_text)
-            d.setStyleSheet("color: #8C9692;")
+            d.setObjectName("card_detail")
             d.setWordWrap(True)
-            c_layout.addWidget(t)
-            c_layout.addWidget(d)
+            card.add(t)
+            card.add(d)
 
-            btn = QPushButton("Open")
-            btn.setObjectName("primary_button")
+            btn = make_primary_button("Open")
             btn.clicked.connect(lambda _, r=route: self._open(r))
-            c_layout.addWidget(btn)
+            card.add(btn)
+            card.add_stretch()
 
-            row = idx // 2
-            col = idx % 2
-            quick_grid.addWidget(card, row, col)
+            quick_grid.addWidget(card, idx // 2, idx % 2)
 
-        quick.addLayout(quick_grid)
-        layout.addLayout(quick)
+        layout.addLayout(quick_grid)
         layout.addStretch()
 
     def _open(self, route: str) -> None:
@@ -149,14 +193,16 @@ class HomePage(QWidget):
         try:
             cpu = psutil.cpu_percent(interval=0.1)
             ram = psutil.virtual_memory().percent
-            self._system_card.findChildren(QLabel)[1].setText(f"CPU {cpu:.0f}% · RAM {ram:.0f}%")
+            self._system_card.set_value(f"CPU {cpu:.0f}% · RAM {ram:.0f}%")
         except Exception:
             pass
 
+        model_ready = False
         try:
             if self._assistant is not None:
                 model_name = getattr(self._assistant, "model_name", None) or "No model loaded"
-                self._ai_card.findChildren(QLabel)[1].setText(model_name)
+                self._ai_card.set_value(model_name)
+                model_ready = model_name != "No model loaded"
         except Exception:
             pass
 
@@ -165,6 +211,11 @@ class HomePage(QWidget):
                 memory = getattr(self._assistant, "_memory", None)
                 if memory is not None:
                     histories = getattr(getattr(memory, "_short_term", None), "get_history", lambda: [])()
-                    self._memory_card.findChildren(QLabel)[1].setText(f"{len(histories)} recent messages")
+                    self._memory_card.set_value(f"{len(histories)} recent messages")
+        except Exception:
+            pass
+
+        try:
+            self._hero.set_status(model_ready)
         except Exception:
             pass

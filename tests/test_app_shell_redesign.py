@@ -166,3 +166,56 @@ class TestEventBusIntegration:
         shell._on_new_conversation()
         assert received == [("NEW_CHAT_REQUESTED", {})]
         assert shell._pages_widget.currentWidget() is shell._page_map["Chat"]
+
+
+class TestHomePageRedesign:
+    def _make_home(self, navigator=None):
+        from ui.home_page import HomePage
+
+        return HomePage(theme=None, assistant_name="Test Assistant", navigator=navigator)
+
+    def test_home_page_has_hero_card(self, qapp):
+        from ui.home_page import AssistantHeroCard
+
+        page = self._make_home()
+        assert isinstance(page._hero, AssistantHeroCard)
+        assert page._hero.objectName() == "assistant_card"
+
+    def test_home_page_status_cards(self, qapp):
+        page = self._make_home()
+        for card in (page._ai_card, page._system_card, page._memory_card, page._privacy_card):
+            assert card.objectName() == "card"
+
+    def test_home_page_no_inline_hex(self, qapp):
+        """HomePage NE sme hardkodirati boje — sve kroz objectName/QSS."""
+        import re
+
+        page = self._make_home()
+        for label in page.findChildren(object):
+            if hasattr(label, "styleSheet") and label.styleSheet():
+                assert not re.search(r"#[0-9A-Fa-f]{6}", label.styleSheet()), (
+                    f"Inline hex u styleSheet: {label.styleSheet()[:60]}"
+                )
+
+    def test_hero_start_conversation_navigates(self, qapp):
+        routes: list[str] = []
+        page = self._make_home(navigator=lambda r: routes.append(r))
+        # klik na primary dugme unutar hero kartice
+        buttons = page._hero.findChildren(object)
+        from PySide6.QtWidgets import QPushButton
+
+        primary = next(
+            (b for b in page._hero.findChildren(QPushButton)
+             if b.objectName() == "primary_button"),
+            None,
+        )
+        assert primary is not None
+        primary.click()
+        assert routes == ["Chat"]
+
+    def test_hero_status_reflects_model(self, qapp):
+        page = self._make_home()
+        page._hero.set_status(False)
+        assert "No model" in page._hero._status_label.text()
+        page._hero.set_status(True)
+        assert "Ready" in page._hero._status_label.text()
