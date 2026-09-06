@@ -52,11 +52,32 @@ class VectorMemory:
         entry = VectorEntry(id=str(len(self._entries)), text=text, vector=vector)
         self._entries.append(entry)
         if self._faiss is not None:
-            self._rebuild_faiss()
+            self._add_to_faiss_incrementally(vector)
         return entry.id
 
     def add_texts(self, texts: list[str]) -> list[str]:
         return [self.add(text) for text in texts]
+
+    # ------------------------------------------------------------------ #
+    def _add_to_faiss_incrementally(self, vector: list[float]) -> None:
+        """Append *vector* to the existing FAISS index — O(dim) per insertion.
+
+        Creates the index on the first insertion.  The positional mapping
+        ``faiss index position == _entries list position`` is preserved:
+        both the list and the index grow together, one entry per ``add()``.
+        Full rebuilds remain the job of :meth:`_rebuild_faiss` and are
+        reserved for operations that legitimately need them (``remove``,
+        explicit rebuilds, future recovery paths) — ordinary insertion never
+        rebuilds.
+        """
+        if self._faiss_index is None:
+            dim = self._embedding_model.dimension
+            self._faiss_index = self._faiss.IndexFlatIP(dim)
+        import numpy as np
+
+        vec = np.array([vector], dtype="float32")
+        self._faiss.normalize_L2(vec)
+        self._faiss_index.add(vec)
 
     # ------------------------------------------------------------------ #
     def _rebuild_faiss(self) -> None:
