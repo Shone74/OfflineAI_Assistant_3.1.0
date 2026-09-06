@@ -1,8 +1,8 @@
-"""Settings stranica za AppShell (Faza 4.9).
+"""Settings page for AppShell (Phase 4.9).
 
-Wrapper po workspace dizajnu — brze postavke (tema, jezik) + dugme koje
-otvara puni SettingsDialog za sve ostale postavke. Dialog ostaje izvor
-sve napredne konfiguracije.
+Wrapper per the workspace design — quick settings (theme, language) + a button
+that opens the full SettingsDialog for all other settings. The dialog remains
+the source of all advanced configuration.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from ui.design.components import Card, make_primary_button, make_section_title
 
 
 class SettingsPage(QWidget):
-    """Glavna Settings stranica u AppShell navigaciji."""
+    """Main Settings page in AppShell navigation."""
 
     def __init__(
         self,
@@ -47,12 +47,12 @@ class SettingsPage(QWidget):
 
         title = QLabel("Settings")
         title.setObjectName("page_title")
-        subtitle = QLabel("Quick settings — sve napredne opcije su u Advanced Settings.")
+        subtitle = QLabel("Quick settings — all advanced options are in Advanced Settings.")
         subtitle.setObjectName("page_subtitle")
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
-        # Quick settings kartica
+        # Quick settings card
         quick_card = Card()
         quick_card.card_layout.addWidget(make_section_title("Quick Settings"))
 
@@ -67,8 +67,10 @@ class SettingsPage(QWidget):
         form.addRow(QLabel("Theme"), self._theme_combo)
 
         self._language_combo = QComboBox()
-        self._language_combo.addItems(["en", "sr"])
+        self._language_combo.addItems(["en"])
         current_lang = self._get_config("app.language", "en")
+        if current_lang != "en":
+            current_lang = "en"
         self._language_combo.setCurrentText(current_lang)
         self._language_combo.currentTextChanged.connect(self._on_language_changed)
         form.addRow(QLabel("Language"), self._language_combo)
@@ -76,12 +78,12 @@ class SettingsPage(QWidget):
         quick_card.card_layout.addLayout(form)
         layout.addWidget(quick_card)
 
-        # Advanced dugme — otvara puni SettingsDialog
+        # Advanced button — opens the full SettingsDialog
         advanced_card = Card()
         advanced_card.card_layout.addWidget(make_section_title("Advanced Settings"))
         desc = QLabel(
             "Model, Memory, Voice, Privacy & Data, Filesystem, Storage, "
-            "Logging, Plugins — sve u jednom dijalogu."
+            "Logging, Plugins — all in one dialog."
         )
         desc.setObjectName("card_detail")
         desc.setWordWrap(True)

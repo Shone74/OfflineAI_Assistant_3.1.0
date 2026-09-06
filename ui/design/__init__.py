@@ -1,6 +1,6 @@
 """Design system paket — tokens, QSS builder, komponente.
 
-Jedini izvor istine za izgled aplikacije (docs/design_system.md).
+The single source of truth for the application design (docs/design_system.md).
 """
 
 from ui.design.tokens import (

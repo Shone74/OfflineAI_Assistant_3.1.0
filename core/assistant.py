@@ -21,7 +21,6 @@ from ai.engine.inference import InferenceSession
 from ai.engine.llm_engine import GenerationConfig, LLMEngine, build_response_prompt
 from ai.models.model_manager import ModelManager
 from ai.prompts.system_prompts import (
-    SERBIAN_SYSTEM_PROMPT_TEMPLATE,
     SYSTEM_PROMPT_TEMPLATE,
 )
 from core.config_manager import ConfigManager
@@ -531,17 +530,65 @@ class Assistant:
         the global Chat model.
 
         - ``model_name == ""`` → returns the global engine (backward compatible).
-        - ``model_name`` set → attempts to load a scoped loader via
+        - ``model_name`` starting with ``openrouter:`` or ``api:`` → returns
+          an :class:`OpenAICompatibleEngine` for the online model (opt-in;
+          requires ``api.enabled`` and a stored key — otherwise falls back
+          to the global engine with a clear warning).
+        - ``model_name`` set (local) → attempts to load a scoped loader via
           ``ModelManager.get_loader_for_model`` and wraps it in a
           ``LlamaCppEngine`` whose ``_model_name_override`` is set.
         - On any failure → logs a warning and falls back to the global engine.
+
+        When ``api.auto_free_models`` is enabled and the agent has no
+        explicit model, a free online model is picked from the user's
+        selection (Settings → Online API) based on the agent's goal/task
+        type — coding, reasoning, vision, or general.
 
         Limitations:
           Loading a second model alongside the Chat model may consume additional
           memory.  If the model is unavailable or the runtime is missing, the
           global engine is used as a transparent fallback — the Agent still runs.
         """
+        # --- Auto free-model routing (no explicit model set) --------------
         if not agent_def.model_name:
+            engine = self._build_auto_free_engine(agent_def)
+            if engine is not None:
+                return engine
+            return self._engine
+
+        # --- Online API routing (explicit user opt-in per agent) ---------
+        model_spec = agent_def.model_name.strip()
+        if ":" in model_spec.split("/")[0] or model_spec.lower().startswith(
+            ("openrouter:", "api:", "groq:", "google:", "gemini:", "mistral:",
+             "cerebras:", "together:", "or:")
+        ):
+            from ai.engine.api_engine import parse_online_model_spec
+
+            provider_id, online_model = parse_online_model_spec(model_spec)
+            engine = self._build_online_engine(provider_id, online_model)
+            if engine is not None:
+                logger.info(
+                    "Agent '%s' routed to online model '%s' (provider=%s)",
+                    agent_def.name, online_model, provider_id or "default",
+                )
+                try:
+                    self.event_bus.publish(
+                        "API_ENGINE_ACTIVE",
+                        data={
+                            "model": online_model,
+                            "provider": provider_id or "default",
+                            "agent": agent_def.name,
+                        },
+                    )
+                except Exception:
+                    logger.debug("API_ENGINE_ACTIVE publish failed", exc_info=True)
+                return engine
+            logger.warning(
+                "Agent '%s' requests online model '%s' but provider '%s' is "
+                "not configured (api.enabled/key missing) — using global "
+                "local engine",
+                agent_def.name, online_model, provider_id or "default",
+            )
             return self._engine
 
         mm = self._model_manager
@@ -568,6 +615,78 @@ class Assistant:
                 agent_def.name, agent_def.model_name, exc,
             )
             return self._engine
+
+    def _build_online_engine(
+        self, provider_id: str, online_model: str
+    ) -> LLMEngine | None:
+        """Build an online engine for *online_model* on the given provider.
+
+        ``provider_id=""`` resolves to the configured default provider.
+        Returns ``None`` when the API is disabled or the provider has no
+        stored key so the caller can fall back to the local engine.
+        """
+        try:
+            from ai.engine.api_engine import build_provider_engine
+
+            return build_provider_engine(self.config, provider_id, online_model)
+        except Exception:
+            logger.warning("Could not build online engine", exc_info=True)
+            return None
+
+    def _build_auto_free_engine(self, agent_def: Agent) -> LLMEngine | None:
+        """Pick a free online model from the user's selection for this agent.
+
+        Uses ``select_free_model_for_task`` heuristics (coding / reasoning /
+        vision / general) over the agent's goal.  Returns ``None`` when the
+        feature is disabled, nothing is selected, or the provider has no
+        stored key — the caller then falls back to the global engine.
+        """
+        try:
+            if not self.config.get("api.auto_free_models", False):
+                return None
+            if not self.config.get("api.enabled", False):
+                return None
+            from ai.engine.api_engine import (
+                provider_is_configured,
+                select_free_model_for_task,
+            )
+
+            task_text = " ".join(
+                part
+                for part in (
+                    agent_def.description or "",
+                    agent_def.system_prompt or "",
+                )
+                if isinstance(part, str)
+            )
+            picked = select_free_model_for_task(self.config, task_text)
+            if picked is None:
+                return None
+            provider_id, model = picked
+            if not provider_is_configured(self.config, provider_id):
+                return None
+            engine = self._build_online_engine(provider_id, model)
+            if engine is not None:
+                logger.info(
+                    "Agent '%s' auto-routed to free model '%s' (provider=%s)",
+                    agent_def.name, model, provider_id,
+                )
+                try:
+                    self.event_bus.publish(
+                        "API_ENGINE_ACTIVE",
+                        data={
+                            "model": model,
+                            "provider": provider_id,
+                            "agent": agent_def.name,
+                            "auto": True,
+                        },
+                    )
+                except Exception:
+                    logger.debug("API_ENGINE_ACTIVE publish failed", exc_info=True)
+            return engine
+        except Exception:
+            logger.debug("Auto free-model routing failed", exc_info=True)
+            return None
 
     def stop(self) -> None:
         """Stop the assistant and clean up resources.
@@ -1135,13 +1254,7 @@ class Assistant:
         return "\n".join(lines)
 
     def _render_system_prompt(self, profile: dict, text: str = "") -> str:
-        """Render the full system prompt from the profile via the template.
-
-        When the user's language (or the profile's explicit language setting)
-        is Serbian, the Serbian template is used so the security, offline,
-        and memory instructions are presented in the same language as the
-        response — avoiding a wall of English followed by one Serbian line.
-        """
+        """Render the full system prompt from the profile via the template."""
         identity_text = self._render_identity_text(profile)
         description = profile.get("identity", {}).get("description", "") or ""
         custom_instructions = self._build_custom_instructions(profile)
@@ -1149,19 +1262,11 @@ class Assistant:
         custom_instructions_block = (
             f"\n{custom_instructions}\n" if custom_instructions else ""
         )
-        template = SYSTEM_PROMPT_TEMPLATE
-        if self._should_use_serbian_prompt(profile, text):
-            template = SERBIAN_SYSTEM_PROMPT_TEMPLATE
-        return template.format(
+        return SYSTEM_PROMPT_TEMPLATE.format(
             identity_text=identity_text,
             description_block=description_block,
             custom_instructions_block=custom_instructions_block,
         )
-
-    def _should_use_serbian_prompt(self, profile: dict, text: str) -> bool:
-        """Return True when the Serbian system-prompt template should be used."""
-        instruction = self._get_language_instruction(text, profile)
-        return bool(instruction)
 
     def process_message(
         self,
@@ -1171,6 +1276,8 @@ class Assistant:
         token_callback: Callable[[str], None] | None = None,
         pulse_callback: Callable[[], None] | None = None,
         publish_fn: EventCallback | None = None,
+        images: list[str] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
     ) -> str:
         """Process a user message and return the LLM-generated response.
 
@@ -1196,12 +1303,21 @@ class Assistant:
         behaviour (``publish_fn=None``) uses ``self.event_bus.publish``,
         preserving backward compatibility.
 
+        *images* — optional list of base64-encoded images attached to the
+        message.  Only used when the active model supports vision; ignored
+        otherwise (a note is returned to the user instead).
+
+        *should_cancel* — optional cooperative cancellation predicate
+        checked between tokens (alternative to *cancel_event*).
+
         Returns an empty string for empty or whitespace-only input.
 
         """
         # Early exit for empty or whitespace-only input
         if not text or not text.strip():
-            return ""
+            if not images:
+                return ""
+            text = "Describe this image."
 
         self._cancel_event = cancel_event
         if publish_fn is not None:
@@ -1240,7 +1356,16 @@ class Assistant:
             response = (
                 command_response
                 if command_response is not None
-                else self._generate_response(text, conversation_profile, cancel_event=cancel_event, token_callback=token_callback, pulse_callback=pulse_callback, publish_fn=publish_fn)
+                else self._generate_response(
+                    text,
+                    conversation_profile,
+                    cancel_event=cancel_event,
+                    token_callback=token_callback,
+                    pulse_callback=pulse_callback,
+                    publish_fn=publish_fn,
+                    images=images,
+                    should_cancel=should_cancel,
+                )
             )
         was_cancelled = (cancel_event is not None and cancel_event.is_set())
         if not was_cancelled and self._memory is not None:
@@ -1267,13 +1392,15 @@ class Assistant:
         token_callback: Callable[[str], None] | None = None,
         pulse_callback: Callable[[], None] | None = None,
         publish_fn: EventCallback | None = None,
+        images: list[str] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
     ) -> str:
         """Generate a response via native tool calling, LLM engine, or stub fallback.
 
         When the active model supports native tool/function calling AND the
         current message is likely to require a tool, the preferred path is
         :meth:`_generate_with_native_tools`.  Ordinary conversational messages
-        (e.g. ``"Ko je bio Nikola Tesla?"``) use the normal chat path with the
+        (e.g. ``"Who was Nikola Tesla?"``) use the normal chat path with the
         model's native chat template instead — they are NOT routed through tool
         calling merely because the model is tool-capable.
 
@@ -1287,6 +1414,13 @@ class Assistant:
         event loop and remain responsive while streaming.
 
         *publish_fn* — see :meth:`process_message`.
+
+        *images* — optional base64 image list for multimodal (vision) models.
+        When the active model lacks vision support the images are ignored and
+        an explanatory note is returned instead of a hallucinated description.
+
+        *should_cancel* — optional cooperative cancellation predicate checked
+        between tokens (alternative to *cancel_event*).
         """
         if publish_fn is not None:
             def pub(event_type: str, data: dict[str, Any] | None = None) -> None:
@@ -1338,14 +1472,7 @@ class Assistant:
         # Use conversation profile if provided, otherwise use effective profile
         profile_to_use = conversation_profile if conversation_profile is not None else self.get_effective_profile()
         # Build base system prompt from effective profile (global + workspace + project overrides)
-        # Serbian template is auto-selected inside _render_system_prompt when Serbian is detected.
         system_prompt = self._render_system_prompt(profile_to_use, text)
-        # Inject additional language steering so the model responds in the user's language.
-        # This is part of the generation context (system instruction), not a
-        # post-processing translation layer.
-        language_instruction = self._get_language_instruction(text, profile_to_use)
-        if language_instruction:
-            system_prompt = f"{system_prompt}\n\n{language_instruction}\n"
         # Inject active project context as authoritative application data
         project_ctx = self._build_project_context_prompt()
         if project_ctx:
@@ -1370,13 +1497,29 @@ class Assistant:
 
         # Build messages list for the model's native chat template.
         # The system message carries the full rendered system prompt (identity,
-        # language steering, project context, memories, RAG).  History messages
-        # already carry their "role" and "content" keys.  The final user message
-        # is the current input.
+        # project context, memories, RAG).  History messages already carry
+        # their "role" and "content" keys.  The final user message is the
+        # current input.
         messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
         if history:
             messages.extend(history[:-1] if history else [])
-        messages.append({"role": "user", "content": text})
+        final_user_message: dict[str, Any] = {"role": "user", "content": text}
+        if images:
+            # Vision gate: only attach images when the active model truly
+            # supports multimodal inference (model + attached projector).
+            if getattr(self._engine, "supports_vision", False):
+                final_user_message["images"] = list(images)
+                logger.info(
+                    "Vision: %d image(s) attached to message", len(images)
+                )
+            else:
+                pub("VISION_REJECTED", data={"images": len(images), "reason": "model_no_vision"})
+                return (
+                    "The active model does not support image understanding. "
+                    "Load a vision-capable model (with its mmproj projector) "
+                    "to analyze images."
+                )
+        messages.append(final_user_message)
 
         cfg = self._build_generation_config()
 
@@ -1397,6 +1540,15 @@ class Assistant:
                     pulse_callback()
                 if cancel_event is not None and cancel_event.is_set():
                     logger.info("Generation cancelled at token boundary")
+                    pub(
+                        "GENERATION_CANCELLED", data={"tokens_generated": len(tokens)}
+                    )
+                    partial = "".join(tokens)
+                    partial = self._post_process_response(partial)
+                    session.fail("cancelled")
+                    return partial
+                if should_cancel is not None and should_cancel():
+                    logger.info("Generation cancelled (predicate) at token boundary")
                     pub(
                         "GENERATION_CANCELLED", data={"tokens_generated": len(tokens)}
                     )
@@ -1447,29 +1599,11 @@ class Assistant:
     # ------------------------------------------------------------------ #
     # Tool call detection (Phase 5 stub NLP — replaced by real planner/agents in Phase 9)
     # ------------------------------------------------------------------ #
-    _SERBIAN_WORDS = (
-        "je", "da", "ti", "ko", "kako", "šta", "što", "sam", "ne", "se",
-        "za", "sa", "od", "do", "po", "na", "u", "iz", "svoj", "svako",
-        "mogu", "može", "hoću", "hocu", "ima", "imaš", "imaju",
-        "to", "ovo", "koje", "koji", "koja",
-    )
-
-    # Words/phrases strongly characteristic of Serbian Latin (without diacritics).
-    # These are NOT shared with common English or are distinctive Serbian vocabulary.
-    _SERBIAN_KEYWORDS = (
-        "srpski", "srbija", "srbiji", "srbiju", "razgovor", "objasni",
-        "objasniti", "objasnite", "rekao", "reči", "reći", "mogu", "možeš",
-        "molim", "hvala", "molim te", "dobar dan", "dovoljno", "ne razumem",
-        "kako to", "sta je", "kako radi", "racunar", "kome", "čime",
-        "gdje", "kada", "kako", "zašto", "zbog", "usled", "takođe",
-        "takodje", "prirodni", "govornik", "slovima", "ćirilicu", "latinicom",
-    )
-
     def _detect_tool_action(self, lowered: str) -> tuple[str, dict] | None:
         """Heuristically decide whether *lowered* should invoke a tool."""
         import re
 
-        if "računar" in lowered or "sistem" in lowered or "system" in lowered or "cpu" in lowered:
+        if "system" in lowered or "cpu" in lowered:
             return ("system_info", {})
         # "ram" as standalone word (not substring like "program")
         if re.search(r"\bram\b", lowered):
@@ -1477,16 +1611,7 @@ class Assistant:
 
         # File-read intent must be detected before application-launch because
         # "open" and "read" appear in both patterns.
-        # Priority 1: Serbian file-read patterns: "proči X", "čitaj X", "otvori fajl X"
-        serbian_file_match = re.search(
-            r"(?:proči|čitaj)(?:\s+fajl)?\s+(.+)|otvori\s+fajl\s+(.+)",
-            lowered,
-        )
-        if serbian_file_match:
-            path = serbian_file_match.group(1) or serbian_file_match.group(2)
-            return ("read_file", {"path": path.strip()})
-
-        # Priority 2: English file-read patterns: "open file X", "read file X"
+        # Priority 1: "open file X", "read file X"
         english_file_match = re.search(
             r"(?:open|read)\s+file\s+(.+)",
             lowered,
@@ -1494,7 +1619,7 @@ class Assistant:
         if english_file_match:
             return ("read_file", {"path": english_file_match.group(1).strip()})
 
-        # Priority 3: "open X" or "read X" where X appears to be a file (has extension)
+        # Priority 2: "open X" or "read X" where X appears to be a file (has extension)
         open_read_with_ext = re.search(
             r"^(?:open|read)\s+(\S+\.\S+)$",
             lowered,
@@ -1502,16 +1627,16 @@ class Assistant:
         if open_read_with_ext:
             return ("read_file", {"path": open_read_with_ext.group(1)})
 
-        # Priority 4: Application-launch patterns
+        # Priority 3: Application-launch patterns
         app_match = re.search(
-            r"(?:otvori|startuj|pokreni|launch|open|start|run)\s+(?:program\s+)?(.+)",
+            r"(?:launch|open|start|run)\s+(?:program\s+)?(.+)",
             lowered,
         )
         if app_match:
             return ("open_application", {"program": app_match.group(1).strip()})
 
         write_match = re.search(
-            r"(?:write|create|upiši|napiši|kreiraj|save|snimi)\s+(?:a\s+|the\s+)?(?:file|fajl|datoteku)\b.*",
+            r"(?:write|create|save)\s+(?:a\s+|the\s+)?file\b.*",
             lowered,
         )
         if write_match:
@@ -1530,87 +1655,6 @@ class Assistant:
         """
         return self._detect_tool_action(lowered) is not None
 
-    # ------------------------------------------------------------------ #
-    # Language detection & steering (Phase 13.1)
-    # ------------------------------------------------------------------ #
-    _SERBIAN_DIACRITICS = "šđčćžŠĐČĆŽ"
-
-    def _detect_language(self, text: str) -> str:
-        """Simple language detection: Serbian vs English.
-
-        Detects Serbian via Cyrillic characters, Serbian Latin diacritics
-        (šđčćž), common Serbian function words, or Serbian-specific keywords.
-        Everything else defaults to English.  This is intentionally lightweight —
-        no external NLP dependency.
-        """
-        import re
-
-        if re.search(r"[а-яА-Я]", text):
-            return "sr"
-        if any(ch in text for ch in self._SERBIAN_DIACRITICS):
-            return "sr"
-        lowered = text.lower()
-        matches = sum(1 for w in self._SERBIAN_WORDS if f" {w} " in f" {lowered} ")
-        if matches >= 2:
-            return "sr"
-        # Check for Serbian-specific lexical items (without diacritics).
-        keyword_hits = sum(1 for kw in self._SERBIAN_KEYWORDS if kw in lowered)
-        if keyword_hits >= 1:
-            return "sr"
-        return "en"
-
-    def _get_language_instruction(self, text: str, profile: dict) -> str:
-        """Return a language-steering instruction for the system prompt.
-
-        Respects the ``communication.language`` profile setting:
-        ``"auto"`` → detect from the current user message.
-        An explicit code (e.g. ``"sr"``, ``"Serbian"``, ``"Srpski"``) always wins.
-        """
-        comm = profile.get("communication", {})
-        configured = comm.get("language", "auto")
-        if configured and configured != "auto":
-            is_sr = self._is_serbian(configured)
-        else:
-            is_sr = self._detect_language(text) == "sr"
-        if is_sr:
-            return self._serbian_language_instruction(text)
-        return ""
-
-    @staticmethod
-    def _is_serbian(lang: str) -> bool:
-        """Check whether a language config value represents Serbian."""
-        val = str(lang).lower().strip()
-        if val.startswith("sr"):
-            return True
-        return "serbian" in val
-
-    def _serbian_language_instruction(self, text: str) -> str:
-        """Build a strong Serbian language-steering instruction.
-
-        Uses Cyrillic if the user's message contains Cyrillic characters;
-        otherwise uses Latin script.
-        """
-        import re as _re
-
-        use_cyrillic = bool(_re.search(r"[а-яА-Я]", text))
-        if use_cyrillic:
-            return (
-                "Odgovaraj na prirotan način na srpskom jeziku koristeći ćirilicu. "
-                "Koristi standardnu srpsku reči i gramatiku. "
-                "Ne pokušavaj da prevedeš engleske izraze doslovno. "
-                "Ne izmišlјaj reči. "
-                "Odgovaraj kao što prirodni govornik srpskog jezika."
-            )
-        return (
-            "Respond in natural Serbian using Latin script. "
-            "Use standard Serbian vocabulary and grammar — do NOT use Croatian "
-            "or Bosnian variants unless the user explicitly requests them. "
-            "Do not translate English expressions literally. "
-            "Do not invent Serbian words. "
-            "Keep established English technical terms in English when they have "
-            "no widely accepted Serbian equivalent. "
-            "Answer naturally as a native Serbian speaker would."
-        )
     def _generate_with_native_tools(
         self,
         text: str,
@@ -1793,7 +1837,7 @@ class Assistant:
         if tool_name == "system_info":
             d = result.data
             return (
-                f"📊 Informacije o sistemu:\n"
+                f"📊 System information:\n"
                 f"  CPU: {d.get('cpu_percent')}%\n"
                 f"  RAM: {d.get('ram_used_percent')}% ({d.get('ram_total_gb')} GB)\n"
                 f"  Disk: {d.get('disk_used_percent')}% ({d.get('disk_total_gb')} GB)\n"
@@ -1801,28 +1845,28 @@ class Assistant:
             )
         if tool_name == "read_file":
             content = result.data.get("content", "")[:500]
-            return f"📄 Sadržaj fajla:\n```\n{content}\n```"
+            return f"📄 File content:\n```\n{content}\n```"
         if tool_name == "open_application":
             return f"✅ {result.message}"
         if tool_name == "search_files":
             results = result.data.get("results", [])
             names = [r["name"] for r in results[:10]]
-            return f"🔍 Pronađeno {len(results)} fajla: {', '.join(names)}"
+            return f"🔍 Found {len(results)} file(s): {', '.join(names)}"
         return result.message
 
     def _format_tool_failure(self, tool_name: str, result: ToolResult) -> str:
         if result.error == "ConfirmationRequired":
-            return f"⚠️ Akcija '{tool_name}' zahteva vašu potvrdu. Da li dozvoljavate?"
-        return f"❌ Greška pri izvršavanju '{tool_name}': {result.message}"
+            return f"⚠️ The action '{tool_name}' requires your confirmation. Do you allow it?"
+        return f"❌ Error executing '{tool_name}': {result.message}"
 
     def _stub_response(self, text: str) -> str:
         lowered = text.strip().lower()
-        if lowered in ("zdravo", "zdravo!", "hi", "hello"):
-            return "Zdravo! Kako mogu pomoći?"
+        if lowered in ("hi", "hello"):
+            return "Hello! How can I help you?"
         return (
-            "AI model još nije učitan. "
-            "Otvorite Settings → Model → Manage Models za download .gguf modela, "
-            "ili pokrenite Setup Wizard ako je ovo prvo pokretanje."
+            "The AI model is not loaded yet. "
+            "Open Settings → Model → Manage Models to download a .gguf model, "
+            "or run the Setup Wizard if this is your first start."
         )
 
     @property
@@ -1879,8 +1923,26 @@ class Assistant:
     @property
     def model_name(self) -> str:
         if self._engine is not None:
-            return self._engine.model_name
-        return "stub"
+            name = self._engine.model_name
+            if name and name != "stub":
+                return name
+        return "No model loaded"
+
+    @property
+    def engine_status(self) -> str:
+        """Human-readable engine status for the UI ('ready' / 'not_loaded' / ...)."""
+        if self._engine is None:
+            return "not_configured"
+        return str(getattr(self._engine, "load_status", "unknown"))
+
+    @property
+    def is_model_ready(self) -> bool:
+        """True when a real (non-stub) model is loaded and ready for inference."""
+        if self._engine is None:
+            return False
+        if not getattr(self._engine, "is_ready", False):
+            return False
+        return getattr(self._engine, "load_status", "") not in ("stub_mode", "not_configured")
 
     def switch_model(self, model_name: str) -> None:
         if self._model_manager is None:
@@ -2334,7 +2396,7 @@ class Assistant:
         instead of being called directly on the worker thread.
         """
         if self._automation is None:
-            return "Automation manager nije konfigurisan"
+            return "Automation manager is not configured"
         result = self._automation.run_workflow(name)
         if publish_fn is not None:
             publish_fn("WORKFLOW_RAN", {"workflow": name})
@@ -2380,7 +2442,7 @@ class Assistant:
         if lowered.startswith("/agent plan"):
             goal = lowered.removeprefix("/agent plan").strip()
             if not goal:
-                return "Navedi cilj nakon /agent plan"
+                return "Provide a goal after /agent plan"
             pub("COMMAND_EXECUTED", data={"command": "agent_plan", "arg": goal})
             return self.run_agent_plan(goal, publish_fn=publish_fn)
         return self._handle_plugin_command(lowered)
@@ -2456,13 +2518,13 @@ class Assistant:
         if not self._memory_enabled():
             logger.info("Memory disabled — ignoring remember request")
             return (
-                "Memorija je isključena; sećanje na ovo nije moguće dok ne "
-                "uključite 'Memory enabled' u podešavanjima."
+                "Memory is disabled; remembering this is not possible until you "
+                "enable 'Memory enabled' in the settings."
             )
         self._pending_memory = fact
         return (
-            f"Može da se sačuva u memoriji:\n\n'{fact}'\n\n"
-            "Da li želiš da zapamtim?"
+            f"This can be saved to memory:\n\n'{fact}'\n\n"
+            "Do you want me to remember it?"
         )
 
     def _maybe_resolve_pending_memory(
@@ -2498,10 +2560,10 @@ class Assistant:
         self._pending_memory = None
         if intent == "negative":
             logger.info("User declined to save memory")
-            return "U redu, neću da sačuvam to u memoriji."
+            return "All right, I will not save that to memory."
         if not self._memory_enabled():
-            return "Memorija je isključena — nije sačuvano."
+            return "Memory is disabled — nothing was saved."
         memory.save_memory(content=pending, mem_type=_classify_memory_type(pending))
         pub("MEMORY_UPDATED", data={"type": "memory_add"})
         logger.info("Memory saved from chat (%s)", pending[:80])
-        return "Sačuvano u memoriji."
+        return "Saved to memory."

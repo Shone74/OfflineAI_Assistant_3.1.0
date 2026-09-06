@@ -31,6 +31,16 @@ data/*.db
 data/*.db-journal
 config/*.local.json
 
+# Runtime data — project-local database folder (never track live DBs/audit logs)
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+database/*.log
+
+# Root clutter — screenshots and generated PDF manuals (kept on disk only)
+Pictures/
+*.pdf
+
 # OS
 Thumbs.db
 desktop.ini

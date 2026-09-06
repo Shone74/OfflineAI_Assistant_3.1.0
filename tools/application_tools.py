@@ -54,12 +54,10 @@ def _build_metadata() -> ToolMetadata:
     )
 
 _KNOWN_APPS: dict[str, str] = {
-    "računar": "explorer",
+    "computer": "explorer",
     "explorer": "explorer",
-    "kalkulator": "calc",
     "calculator": "calc",
     "notepad": "notepad",
-    "pregledač": "msedge",
     "browser": "msedge",
     "cmd": "cmd",
     "powershell": "powershell",
@@ -70,9 +68,9 @@ class ApplicationLauncherTool(Tool):
     """Launches a desktop application by name or path."""
 
     name = "open_application"
-    description = "Pokreni program (npr. kalkulator, pretraživač)"
+    description = "Launch a program (e.g. calculator, browser)"
     category: ToolCategory = ToolCategory.APPLICATION
-    parameters: ClassVar[list[ParameterSpec]] = [ParameterSpec(name="program", description="Naziv programa ili putanja")]
+    parameters: ClassVar[list[ParameterSpec]] = [ParameterSpec(name="program", description="Program name or path")]
     risk_level = RiskLevel.WRITE
 
     def get_metadata(self) -> ToolMetadata:
@@ -82,7 +80,7 @@ class ApplicationLauncherTool(Tool):
         program = str(params.get("program", "")).strip()
         if not program:
             return ToolResult(
-                success=False, message="Nije naveden program", error="MissingProgram"
+                success=False, message="No program specified", error="MissingProgram"
             )
 
         target = _KNOWN_APPS.get(program.lower(), program)
@@ -95,12 +93,12 @@ class ApplicationLauncherTool(Tool):
             logger.info("Launched application: %s", target)
             return ToolResult(
                 success=True,
-                message=f"Pokrenut program: {target}",
+                message=f"Launched program: {target}",
                 data={"program": target},
             )
         except FileNotFoundError:
             return ToolResult(
-                success=False, message=f"Program nije pronađen: {target}",
+                success=False, message=f"Program not found: {target}",
                 error="FileNotFoundError",
             )
         except OSError as exc:

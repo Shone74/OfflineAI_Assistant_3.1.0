@@ -835,10 +835,10 @@ class SoundDeviceAudioManager(AudioManager):
             raise AudioCaptureError(f"failed to start recording: {exc}") from exc
 
     def buffer_size(self) -> int:
-        """Vrati trenutnu veličinu capture buffer-a (bajtovi, thread-safe).
+        """Return the current capture buffer size (bytes, thread-safe).
 
-        Koristi ga VoiceManager silence watchdog (Automatic Listening) da
-        detektuje kraj izjave: buffer koji ne raste = tišina.
+        Used by the VoiceManager silence watchdog (Automatic Listening) to
+        detect the end of an utterance: a buffer that stops growing = silence.
         """
         with self._lock:
             return len(self._buffer)

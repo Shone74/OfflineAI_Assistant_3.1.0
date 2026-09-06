@@ -84,11 +84,13 @@ class GenerationWorker(QThread):
         assistant: Assistant,
         text: str,
         cancel_event: threading.Event,
+        images: list | None = None,
     ) -> None:
         super().__init__()
         self._assistant = assistant
         self._text = text
         self._cancel_event = cancel_event
+        self._images = images
 
     def run(self) -> None:
         try:
@@ -98,6 +100,7 @@ class GenerationWorker(QThread):
                 token_callback=self._on_token,
                 pulse_callback=lambda: None,
                 publish_fn=_noop_publish,
+                images=self._images,
             )
         except Exception as exc:
             self.generation_failed.emit(str(exc))
@@ -321,6 +324,7 @@ class MainWindow(QMainWindow):
         self._model_combo.currentTextChanged.connect(self._on_model_changed)
 
         self._chat.send_requested.connect(self._on_send)
+        self._chat.send_with_images_requested.connect(self._on_send_with_images)
         self._chat.new_chat_requested.connect(self._on_new_chat_requested)
         self._chat.search_requested.connect(self._on_search_memory_requested)
         self._chat.stop_generation.connect(self._on_stop_generation)
@@ -359,6 +363,10 @@ class MainWindow(QMainWindow):
         self._event_sub_ids.append(("MODEL_LOADED", self._event_bus.subscribe("MODEL_LOADED", self._on_model_loaded)))
         self._event_sub_ids.append(("MODEL_UNLOADED", self._event_bus.subscribe("MODEL_UNLOADED", self._on_model_unloaded)))
         self._event_sub_ids.append(("MODEL_LOAD_FAILED", self._event_bus.subscribe("MODEL_LOAD_FAILED", self._on_model_load_failed)))
+        self._event_sub_ids.append(("API_ENGINE_ACTIVE", self._event_bus.subscribe("API_ENGINE_ACTIVE", self._on_api_engine_active)))
+
+        # The Vision button reflects the current model from the very start
+        self._sync_vision_availability()
 
     def _build_sidebar(self) -> QListWidget:
         nav = QListWidget()
@@ -484,7 +492,7 @@ class MainWindow(QMainWindow):
         """
         QApplication.processEvents()
 
-    def _start_generation(self, text: str) -> str:
+    def _start_generation(self, text: str, images: list | None = None) -> str:
         """Run process_message with per-generation cancel event and pulse callback.
 
         Determines whether to use the background QThread worker path (normal
@@ -513,7 +521,11 @@ class MainWindow(QMainWindow):
         response = ""
         try:
             lowered = text.strip().lower()
-            if lowered.startswith("/"):
+            if images:
+                # Multimodal path — always the worker (streaming chat);
+                # images bypass tool heuristics.
+                response = self._start_generation_worker(text, images=images)
+            elif lowered.startswith("/"):
                 response = self._start_generation_sync(text)
             else:
                 needs_tool = self._assistant._message_needs_tool(lowered)
@@ -550,7 +562,7 @@ class MainWindow(QMainWindow):
             pulse_callback=pulse,
         )
 
-    def _start_generation_worker(self, text: str) -> str:
+    def _start_generation_worker(self, text: str, images: list | None = None) -> str:
         """Background generation via GenerationWorker(QThread).
 
         Uses QApplication.processEvents() to pump the event loop while
@@ -559,7 +571,7 @@ class MainWindow(QMainWindow):
         """
         assert self._cancel_event is not None
         worker = GenerationWorker(
-            self._assistant, text, self._cancel_event
+            self._assistant, text, self._cancel_event, images
         )
         self._generation_worker = worker
 
@@ -647,6 +659,22 @@ class MainWindow(QMainWindow):
         self._response_displayed = False
         self._tokens_streamed = False
         return self._start_generation(text)
+
+    def _on_send_with_images(self, text: str, images: list) -> None:
+        """Multimodal send — images forwarded to Assistant.process_message."""
+        self._current_response = ""
+        self._response_displayed = False
+        self._tokens_streamed = False
+        self._start_generation(text, images=images)
+
+    def _sync_vision_availability(self) -> None:
+        """Enable/disable the chat Vision button from the active model."""
+        engine = getattr(self._assistant, "_engine", None)
+        available = bool(getattr(engine, "supports_vision", False)) if engine else False
+        try:
+            self._chat.set_vision_available(available)
+        except Exception:
+            logger.debug("set_vision_available failed", exc_info=True)
 
     # ------------------------------------------------------------------ #
     # Voice input (Phase 7)
@@ -890,6 +918,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_capabilities_page"):
             self._capabilities_page.refresh()
 
+        self._sync_vision_availability()
+
     def _on_model_unloaded(self, event_type: str, data: dict) -> None:
         """React to MODEL_UNLOADED — clear main window model indicators."""
         self._status.set_model("")
@@ -902,6 +932,8 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "_capabilities_page"):
             self._capabilities_page.refresh()
+
+        self._sync_vision_availability()
 
     def _populate_model_combo(self) -> None:
         """Populate _model_combo with all available chat-compatible models.
@@ -959,6 +991,12 @@ class MainWindow(QMainWindow):
             f"Model could not be loaded.\n\nError: {error}\n\n"
             "Ensure llama-cpp-python is installed: pip install llama-cpp-python",
         )
+
+    def _on_api_engine_active(self, event_type: str, data: dict) -> None:
+        """Online API engine is serving a turn — surface it in the chat UI."""
+        model = str(data.get("model", "online model"))
+        self._chat.set_online_active(True)
+        self._status.showMessage(f"Online model active: {model}", 4000)
 
     def _install_shortcuts(self) -> None:
         shortcut_new = QShortcut("Ctrl+N", self)

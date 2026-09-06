@@ -85,7 +85,7 @@ class SystemMonitorTool(Tool):
     """Provides CPU, memory, disk, and GPU utilisation."""
 
     name = "system_info"
-    description = "Prikaži informacije o računaru (CPU, RAM, disk, GPU)"
+    description = "Show computer information (CPU, RAM, disk, GPU)"
     category: ToolCategory = ToolCategory.SYSTEM
     parameters: ClassVar[list[ParameterSpec]] = []
     risk_level = RiskLevel.INFO
@@ -109,7 +109,7 @@ class SystemMonitorTool(Tool):
             "gpu": gpu,
         }
         logger.debug("System metrics: %s", data)
-        return ToolResult(success=True, message="Informacije o sistemu", data=data)
+        return ToolResult(success=True, message="System information", data=data)
 
 
 def _build_process_info_metadata() -> ToolMetadata:
@@ -165,7 +165,7 @@ class ProcessInfoTool(Tool):
     """Provides information about running processes."""
 
     name = "process_info"
-    description = "Prikaži informacije o pokrenutim procesima"
+    description = "Show information about running processes"
     category: ToolCategory = ToolCategory.SYSTEM
     parameters: ClassVar[list[ParameterSpec]] = [
         ParameterSpec(
@@ -211,7 +211,7 @@ class ProcessInfoTool(Tool):
             logger.debug("Process info: %d processes", len(procs))
             return ToolResult(
                 success=True,
-                message=f"Informacije o {len(procs)} procesu",
+                message=f"Information about {len(procs)} processes",
                 data={"processes": procs},
             )
         except psutil.AccessDenied as exc:

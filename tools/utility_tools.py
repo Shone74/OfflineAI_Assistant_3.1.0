@@ -347,10 +347,10 @@ class CalculateTool(Tool):
     """Performs mathematical calculations safely."""
 
     name = "calculate"
-    description = "Izračunaj matematički izraz"
+    description = "Calculate a mathematical expression"
     category: ToolCategory = ToolCategory.UTILITY
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="expression", description="Matematički izraz (npr. 2+2, sqrt(16))"),
+        ParameterSpec(name="expression", description="Mathematical expression (e.g. 2+2, sqrt(16))"),
     ]
     risk_level = RiskLevel.INFO
 
@@ -361,7 +361,7 @@ class CalculateTool(Tool):
         expression = str(params.get("expression", ""))
         if not expression.strip():
             return ToolResult(
-                success=False, message="Nije dat izraz", error="MissingExpression"
+                success=False, message="No expression given", error="MissingExpression"
             )
 
         try:
@@ -371,7 +371,7 @@ class CalculateTool(Tool):
             logger.debug("Calculate: %s = %s", expression, result)
             return ToolResult(
                 success=True,
-                message=f"Rezultat: {result}",
+                message=f"Result: {result}",
                 data={"expression": expression, "result": result},
             )
         except ValueError as exc:
@@ -380,7 +380,7 @@ class CalculateTool(Tool):
             )
         except ZeroDivisionError:
             return ToolResult(
-                success=False, message="Deljenje nulom", error="DivisionByZero"
+                success=False, message="Division by zero", error="DivisionByZero"
             )
         except Exception as exc:
             return ToolResult(
@@ -392,7 +392,7 @@ class DateTimeTool(Tool):
     """Returns current local date and time information."""
 
     name = "date_time"
-    description = "Prikaži trenutni datum i vreme"
+    description = "Show the current date and time"
     category: ToolCategory = ToolCategory.UTILITY
     parameters: ClassVar[list[ParameterSpec]] = [
         ParameterSpec(
@@ -431,7 +431,7 @@ class DateTimeTool(Tool):
         logger.debug("DateTime: %s", text)
         return ToolResult(
             success=True,
-            message=f"Trenutno: {text}",
+            message=f"Current: {text}",
             data=data,
         )
 
@@ -440,7 +440,7 @@ class ClipboardReadTool(Tool):
     """Reads text from the system clipboard."""
 
     name = "clipboard_read"
-    description = "Proči sadržaj klipatura"
+    description = "Read the clipboard contents"
     category: ToolCategory = ToolCategory.UTILITY
     parameters: ClassVar[list[ParameterSpec]] = []
     risk_level = RiskLevel.READ_ONLY
@@ -453,7 +453,7 @@ class ClipboardReadTool(Tool):
             text = _read_clipboard()
             return ToolResult(
                 success=True,
-                message="Pročitano iz klipatura",
+                message="Read from clipboard",
                 data={"text": text},
             )
         except RuntimeError as exc:
@@ -466,10 +466,10 @@ class ClipboardWriteTool(Tool):
     """Writes text to the system clipboard."""
 
     name = "clipboard_write"
-    description = "Piši sadržaj u klipaturu"
+    description = "Write contents to the clipboard"
     category: ToolCategory = ToolCategory.UTILITY
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="text", description="Tekst za upis u klipaturu"),
+        ParameterSpec(name="text", description="Text to write to the clipboard"),
     ]
     risk_level = RiskLevel.WRITE
 
@@ -482,7 +482,7 @@ class ClipboardWriteTool(Tool):
             _write_clipboard(text)
             return ToolResult(
                 success=True,
-                message="Upisano u klipaturu",
+                message="Written to clipboard",
                 data={"success": True},
             )
         except RuntimeError as exc:

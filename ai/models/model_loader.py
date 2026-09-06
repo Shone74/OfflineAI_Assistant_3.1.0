@@ -298,9 +298,9 @@ class StubModelLoader(ModelLoader):
         stop: list[str] | None = None,
     ) -> str:
         return (
-            "Ovo je placeholder odgovor jer nema učitanog AI modela. "
-            "Instalirajte .gguf model u folder models/llm/ da biste dobili "
-            "pravi odgovor. (StubModelLoader — FAZA 3 fallback)"
+            "This is a placeholder response because no AI model is loaded. "
+            "Install a .gguf model in the models/llm/ folder to get "
+            "a real answer. (StubModelLoader — PHASE 3 fallback)"
         )
 
     def generate_stream(
@@ -459,8 +459,13 @@ class GGUFModelLoader(ModelLoader):
     supports it, e.g. via CUDA/Metal/Vulkan build of llama.cpp).
 
     When ``n_gpu_layers`` is set to ``Auto`` (or omitted on an AutoConfig),
-    the loader attempts to auto-detect the optimal GPU layer count based on
-    the model file size and available GPU VRAM.
+    the loader attempts to auto-detect the optimal GPU layer count based
+    on the model file size and available GPU VRAM.
+
+    Vision: multimodal (vision) models need a companion ``mmproj*.gguf``
+    clip projector.  Pass ``mmproj_path`` (auto-detected by
+    :class:`ModelManager` for vision-capable models) to enable image
+    understanding.
     """
 
     is_stub: bool = False
@@ -471,10 +476,13 @@ class GGUFModelLoader(ModelLoader):
         n_gpu_layers: int = 0,
         n_ctx: int = 4096,
         auto_gpu_layers: bool = False,
+        mmproj_path: Path | None = None,
     ) -> None:
         self.n_threads = n_threads
         self.n_ctx = n_ctx
         self._auto_gpu = auto_gpu_layers
+        self._mmproj_path = mmproj_path
+        self._vision_enabled = mmproj_path is not None
         self._model: Any = None
         self._model_path: Path | None = None
         self._load_error: str | None = None
@@ -483,41 +491,90 @@ class GGUFModelLoader(ModelLoader):
         else:
             self.n_gpu_layers = n_gpu_layers
 
+    @property
+    def vision_enabled(self) -> bool:
+        """True when a vision projector is attached and usable."""
+        return self._vision_enabled
+
+    def _attach_vision_projector(self) -> None:
+        """Attach the mmproj clip projector to the loaded model.
+
+        Tries the modern ``libmtmd`` path first (llama-cpp-python >= 0.3.x
+        accepts ``mmproj`` at load time via the ``Llama`` constructor —
+        handled in :meth:`load``) and falls back to the legacy
+        ``Llava15ChatHandler`` for older versions.  When neither works the
+        model still runs text-only.
+        """
+        if self._model is None or self._mmproj_path is None:
+            return
+        # Modern path: constructor kwarg handled in load(); nothing to do.
+        if getattr(self._model, "_clip_ctx", None) is not None:
+            self._vision_enabled = True
+            return
+        # Legacy path: Llava15ChatHandler with clip model.
+        try:
+            from llama_cpp import Llava15ChatHandler
+
+            handler = Llava15ChatHandler(
+                clip_model_path=str(self._mmproj_path),
+                n_ctx=self.n_ctx,
+            )
+            self._model.chat_handler = handler
+            self._vision_enabled = True
+            logger.info("Vision projector attached (legacy handler): %s", self._mmproj_path)
+        except Exception as exc:
+            self._vision_enabled = False
+            logger.warning(
+                "Vision projector could not be attached (%s) — running text-only", exc
+            )
+
     def load(self, path: Path) -> None:
         self._load_error = None
         try:
             from llama_cpp import Llama
         except ImportError as exc:
             raise ImportError(
-                "llama-cpp-python nije instaliran. "
-                "Instalirajte: pip install llama-cpp-python"
+                "llama-cpp-python is not installed. "
+                "Install it with: pip install llama-cpp-python"
             ) from exc
 
         if not path.exists():
-            raise FileNotFoundError(f"Model nije pronađen: {path}")
+            raise FileNotFoundError(f"Model not found: {path}")
 
         _profiler.start_load_timer()
         logger.info(
-            "Loading GGUF model: %s (threads=%d, gpu_layers=%d, ctx=%d)",
+            "Loading GGUF model: %s (threads=%d, gpu_layers=%d, ctx=%d, mmproj=%s)",
             path, self.n_threads, self.n_gpu_layers, self.n_ctx,
+            self._mmproj_path if self._mmproj_path else "none",
         )
         try:
-            self._model = Llama(
-                model_path=str(path),
-                n_ctx=self.n_ctx,
-                n_threads=self.n_threads,
-                n_gpu_layers=self.n_gpu_layers,
-                verbose=False,
-            )
+            kwargs: dict[str, Any] = {
+                "model_path": str(path),
+                "n_ctx": self.n_ctx,
+                "n_threads": self.n_threads,
+                "n_gpu_layers": self.n_gpu_layers,
+                "verbose": False,
+            }
+            if self._mmproj_path is not None and self._mmproj_path.exists():
+                kwargs["mmproj"] = str(self._mmproj_path)
+            try:
+                self._model = Llama(**kwargs)
+            except TypeError:
+                # Older llama-cpp-python without the mmproj kwarg — load
+                # text-only and attach the projector afterwards.
+                kwargs.pop("mmproj", None)
+                self._model = Llama(**kwargs)
         except Exception as exc:
-            raise RuntimeError(f"Neuspešno učitavanje modela {path.name}: {exc}") from exc
+            raise RuntimeError(f"Failed to load model {path.name}: {exc}") from exc
 
         self._model_path = path
+        if self._mmproj_path is not None:
+            self._attach_vision_projector()
         load_time = _profiler.end_load_timer()
         chat_format = getattr(self._model, "chat_format", None)
         logger.info(
-            "Model loaded: %s (%.2fs) — native chat format: %s",
-            path.name, load_time, chat_format,
+            "Model loaded: %s (%.2fs) — native chat format: %s, vision: %s",
+            path.name, load_time, chat_format, self._vision_enabled,
         )
 
     def generate(
@@ -527,7 +584,7 @@ class GGUFModelLoader(ModelLoader):
         stop: list[str] | None = None,
     ) -> str:
         if self._model is None:
-            raise RuntimeError("Model nije učitan. Pozovite load() prvo.")
+            raise RuntimeError("Model is not loaded. Call load() first.")
         _profiler.start_inference_timer()
         try:
             output = self._model(
@@ -550,7 +607,7 @@ class GGUFModelLoader(ModelLoader):
                     model.last_inference_metrics = metrics
             return text
         except Exception as exc:
-            raise RuntimeError(f"Greška pri generisanju: {exc}") from exc
+            raise RuntimeError(f"Generation error: {exc}") from exc
 
     def generate_stream(
         self, prompt: str, max_tokens: int = 512, temperature: float = 0.7,
@@ -559,7 +616,7 @@ class GGUFModelLoader(ModelLoader):
         stop: list[str] | None = None,
     ) -> Iterator[str]:
         if self._model is None:
-            raise RuntimeError("Model nije učitan. Pozovite load() prvo.")
+            raise RuntimeError("Model is not loaded. Call load() first.")
         _profiler.start_inference_timer()
         _profiler.set_prompt_tokens(len(prompt.split()))
         try:
@@ -579,7 +636,7 @@ class GGUFModelLoader(ModelLoader):
                 if model:
                     model.last_inference_metrics = metrics
         except Exception as exc:
-            raise RuntimeError(f"Greška pri streaming generisanju: {exc}") from exc
+            raise RuntimeError(f"Streaming generation error: {exc}") from exc
 
     def generate_chat(
         self,
@@ -601,7 +658,7 @@ class GGUFModelLoader(ModelLoader):
         (llama.cpp applies the model's native EOS via the template).
         """
         if self._model is None:
-            raise RuntimeError("Model nije učitan. Pozovite load() prvo.")
+            raise RuntimeError("Model is not loaded. Call load() first.")
         _profiler.start_inference_timer()
         try:
             output = self._model.create_chat_completion(
@@ -625,7 +682,7 @@ class GGUFModelLoader(ModelLoader):
                     model.last_inference_metrics = metrics
             return text
         except Exception as exc:
-            raise RuntimeError(f"Greška pri chat generisanju: {exc}") from exc
+            raise RuntimeError(f"Chat generation error: {exc}") from exc
 
     def generate_chat_stream(
         self,
@@ -640,7 +697,7 @@ class GGUFModelLoader(ModelLoader):
     ) -> Iterator[str]:
         """Stream chat tokens using the model's native chat template."""
         if self._model is None:
-            raise RuntimeError("Model nije učitan. Pozovite load() prvo.")
+            raise RuntimeError("Model is not loaded. Call load() first.")
         _profiler.start_inference_timer()
         try:
             completion_tokens = 0
@@ -666,7 +723,7 @@ class GGUFModelLoader(ModelLoader):
                 if model:
                     model.last_inference_metrics = metrics
         except Exception as exc:
-            raise RuntimeError(f"Greška pri streaming chat generisanju: {exc}") from exc
+            raise RuntimeError(f"Streaming chat generation error: {exc}") from exc
 
     def unload(self) -> None:
         if self._model is not None:
@@ -708,7 +765,7 @@ class GGUFModelLoader(ModelLoader):
         The tokenize method expects bytes and returns token IDs.
         """
         if self._model is None:
-            raise RuntimeError("Model nije učitan. Pozovite load() prvo.")
+            raise RuntimeError("Model is not loaded. Call load() first.")
 
         try:
             transcript = self._build_chat_transcript(messages)
@@ -867,7 +924,8 @@ def infer_capabilities(name: str, architecture: str = "", model_family: str = ""
     if "coder" in combined or "code" in combined:
         caps.code_generation = True
 
-    if "vision" in combined or "vl" in combined or "image" in combined or "img" in combined:
+    vision_hints = ("vision", "vl", "image", "img", "llava", "moondream", "minicpm-v", "minicpmv", "gemma3n", "pixtral", "internvl", "lamm")
+    if any(h in combined for h in vision_hints):
         caps.vision = True
         caps.multimodal = True
 

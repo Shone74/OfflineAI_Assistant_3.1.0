@@ -1,4 +1,9 @@
-"""Translation infrastructure for UI localization."""
+"""Translation infrastructure for UI localization.
+
+The application is English-only.  This module keeps the translation
+lookup API for compatibility but serves English strings regardless of
+the configured language value.
+"""
 
 from __future__ import annotations
 
@@ -6,21 +11,17 @@ from enum import Enum
 
 
 class Language(Enum):
+    """Application language — English only (kept for config compatibility)."""
+
     ENGLISH = "en"
-    SERBIAN = "sr"
 
     @classmethod
     def from_string(cls, value: str) -> Language:
-        value = value.lower().strip()
-        if value in ("en", "english", "en_us", "en_gb"):
-            return cls.ENGLISH
-        if value in ("sr", "serbian", "sr_rs", "sr_latn"):
-            return cls.SERBIAN
         return cls.ENGLISH
 
 
 class TranslationManager:
-    """Simple translation manager for UI strings."""
+    """Simple translation manager for UI strings (English-only)."""
 
     _instance: TranslationManager | None = None
     _current_language: Language = Language.ENGLISH
@@ -35,7 +36,7 @@ class TranslationManager:
 
     @classmethod
     def set_language(cls, lang: Language) -> None:
-        cls._current_language = lang
+        cls._current_language = Language.ENGLISH
 
     def tr(self, key: str) -> str:
         """Translate a key to the current language."""
@@ -95,62 +96,8 @@ Your profile controls how the assistant responds to your queries.""",
     "user_prefix": "You",
 }
 
-_SERBIAN_STRINGS = {
-    "welcome_title": "Dobrodošli — Offline AI Asistent",
-    "offline_message": """<b>Vaš asistent je 100% offline / lokalan.</b>
-
-• Vaši podaci i konverzacije ostaju na vašem računaru
-• Nema obaveznih internetskih poslova
-• AI model radi direktno na vašem uređaju
-• Sve konfiguracije se čuvaju lokalno u settings.json fajlu""",
-    "model_available": "<b>Aktivni model:</b> {model}\n\nKapaciteti{capabilities}: polni i pouzdani offline odgovori.",
-    "model_available_caps": "tekstgenerator, streaming, razumevanje, generisanje koda",
-    "no_model": "<b>Aktivni model:</b> (nema učitanog modela)\n\nPrenesite .gguf model u folder \\models\\llm\\ da biste dobili pravi AI odgovor.",
-    "stub_mode": """<b>Aktivni režim:</b> Ograničen (stub aktivan)
-
-Vaša aplikacija radi uz stub zamenu dok ne postavite AI model.
-Konverzacije će biti ograničene na placeholder odgovore.
-
-Prenesite .gguf model u folder \\models\\llm\\ da biste dobili
-pravi AI odgovor sa kontekstualnim pamćenjem.""",
-    "model_section_title": "AI Model",
-    "profile_section_title": "Assistant Profile",
-    "profile_intro": """<b>Profil asistenta — "Vaš asistent. Vaš način."</b>
-
-Kliknite na ikonu ⚙ u gornjem desnom uglu da biste:
-• Promenili ime asistenta
-• Postavili ličnost i stil komunikacije
-• Definisli oblasti struna
-• Postavili kutije i granice
-
-Vaš profil kontrola kako asistent odgovara na vaše upite.""",
-    "dialog_ok": "OK",
-    "settings": "Postavke",
-    "close": "Zatvori",
-    "save": "Sačuvaj",
-    "cancel": "Otkazi",
-    "theme": "Tema",
-    "theme_dark": "tamna",
-    "theme_light": "jasna",
-    "theme_cyber": "kibernetska",
-    "model_title": "AI Model",
-    "model_name": "Ime modela",
-    "app_status": "OFFLINE AI ASSISTANT",
-    "memory_label": "Memory",
-    "agents_label": "Agenti",
-    "tools_label": "Alati",
-    "voice_label": "Glas",
-    "home_label": "🏠 Home",
-    "chat_label": "💬 Chat",
-    "send_button": "Pošalji",
-    "input_placeholder": "Unesite poruku...",
-    "assistant_prefix": "Asistent",
-    "user_prefix": "Vi",
-}
-
 TRANSLATIONS: dict[Language, dict[str, str]] = {
     Language.ENGLISH: _ENGLISH_STRINGS,
-    Language.SERBIAN: _SERBIAN_STRINGS,
 }
 
 

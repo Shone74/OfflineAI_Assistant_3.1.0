@@ -1,29 +1,29 @@
-# Dokumentacija — Offline AI Assistant Redizajn
+# Documentation — Offline AI Assistant Redesign
 
-Ovaj folder je **jedini izvor istine** za plan i napredak redizajna. Ažurira se posle svakog uspešno završenog koraka.
+This folder is the **single source of truth** for the redesign plan and progress. It is updated after every successfully completed step.
 
-## Sadržaj
+## Contents
 
-| Dokument | Svrha | Kada se ažurira |
+| Document | Purpose | When it is updated |
 |---|---|---|
-| [`project_plan.md`](project_plan.md) | **PLAN** — mapa svih koraka (9 faza, 47 koraka), zavisnosti, verifikacioni kriterijumi | Retko (samo kad se plan strukturu promeni) |
-| [`current_status.md`](current_status.md) | **STATUS** — praćenje napretka po koracima, dnevnik promena, otvoreni problemi | **Posle svakog uspešno rešenog koraka** |
-| [`design_system.md`](design_system.md) | Kompletna specifikacija ciljnog izgleda (palete, komponente, layout) iz `Izgled Aplikaccije/` | Kad se dizajn odluči izmeniti |
-| [`models_report.md`](models_report.md) | Analiza kandidata iz E:\models, odluka o modelima, putanje, inference parametri | Kad se promeni izbor modela |
-| [`environment.md`](environment.md) | Hardver, Python okruženja (3.11 verified), standardne komande, runtime putanje | Kad se promeni okruženje |
-| [`qa_checklist.md`](qa_checklist.md) | Definicija "bez regresije" — smoke suite, funkcionalna matrica F1–F20, vizuelne provere | Stabilna |
+| [`project_plan.md`](project_plan.md) | **PLAN** — map of all steps (9 phases, 47 steps), dependencies, verification criteria | Rarely (only when the plan structure changes) |
+| [`current_status.md`](current_status.md) | **STATUS** — progress tracking per step, change log, open issues | **After every successfully completed step** |
+| [`design_system.md`](design_system.md) | Complete specification of the target design (palettes, components, layout) from `Izgled Aplikaccije/` | When the design is changed |
+| [`models_report.md`](models_report.md) | Analysis of candidates from E:\models, model decisions, paths, inference parameters | When the model selection changes |
+| [`environment.md`](environment.md) | Hardware, Python environments (3.11 verified), standard commands, runtime paths | When the environment changes |
+| [`qa_checklist.md`](qa_checklist.md) | Definition of "no regression" — smoke suite, functional matrix F1–F20, visual checks | Stable |
 
-## Kako raditi (workflow)
+## How to work (workflow)
 
-1. Pročitaj `project_plan.md` — nađi prvi ne-završeni korak (po redosledu faza).
-2. Izvrši korak.
-3. Verifikuj prema koloni "Verifikacija" u planu + relevantne stavke iz `qa_checklist.md`.
-4. Ažuriraj `current_status.md`: promeni status koraka (⬜→✅), procenat faze, dodaj red u "Dnevnik promena".
+1. Read `project_plan.md` — find the first unfinished step (in phase order).
+2. Execute the step.
+3. Verify according to the "Verification" column in the plan + relevant items from `qa_checklist.md`.
+4. Update `current_status.md`: change the step status (⬜→✅), the phase percentage, and add a row to the "Change log".
 5. Commit.
 
-## Kratki sažetak stanja (2026-09-04)
+## Brief status summary (2026-09-04)
 
-- Analiza završena; launcher sadrži potvrđen `NameError` bug (popravka u koraku 1.1)
-- Modeli izabrani i **kopirani u projekat**: Qwen2.5-Coder-7B Q4_K_M (primarni) + Phi-4-mini Q6_K_L (sekundarni)
-- Razvoj na **Python 3.11.9** (llama-cpp-python nedostupan na 3.14)
-- Sledeći korak: **0.1 Git init** → **0.3 Baseline test suite** → FAZA 1
+- Analysis completed; the launcher contains a confirmed `NameError` bug (fix in step 1.1)
+- Models selected and **copied into the project**: Qwen2.5-Coder-7B Q4_K_M (primary) + Phi-4-mini Q6_K_L (secondary)
+- Development on **Python 3.11.9** (llama-cpp-python unavailable on 3.14)
+- Next step: **0.1 Git init** → **0.3 Baseline test suite** → PHASE 1

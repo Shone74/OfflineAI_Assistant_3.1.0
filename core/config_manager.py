@@ -86,7 +86,7 @@ _DEFAULTS: dict[str, Any] = {
     },
     "voice": {
         "enabled": True,
-        "language": "sr",
+        "language": "auto",
         "stt": {
             "provider": "faster-whisper",
             "model": "base",
@@ -114,6 +114,21 @@ _DEFAULTS: dict[str, Any] = {
         "output_device_hostapi": "",
         "prefer_wasapi": True,
         "wasapi_fallback_to_mme": True,
+    },
+    "api": {
+        "enabled": False,
+        "default_provider": "openrouter",
+        # Legacy flat mirror (kept for backward compatibility with the
+        # single-provider era; synced with providers.<default>):
+        "api_key": "",
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "",
+        "timeout": 120,
+        # Multi-provider store: {"openrouter": {"api_key": ..., "base_url": ..., "model": ...}, ...}
+        "providers": {},
+        # User-registered custom OpenAI-compatible providers:
+        # {"myprovider": {"base_url": "https://..."}}
+        "custom_providers": {},
     },
 }
 

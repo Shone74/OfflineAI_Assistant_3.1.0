@@ -31,7 +31,7 @@ class StubReasoner:
         return self._iterations < self._max_iterations
 
     def conclude(self, observations: list[str]) -> str:
-        return "\n".join(observations) if observations else "Nema rezultata."
+        return "\n".join(observations) if observations else "No results."
 
     def reset(self) -> None:
         self._iterations = 0

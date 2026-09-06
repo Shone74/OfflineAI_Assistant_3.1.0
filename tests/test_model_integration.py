@@ -1,7 +1,7 @@
-"""Testovi Faze 6: model integracija (GPU, parametri, discovery).
+"""Phase 6 tests: model integration (GPU, params, discovery).
 
-Ovi testovi su namerno brzi — NE pokrecu inferenciju (osim skip-if-GPU
-tolerantnog loadanja metadata). Puna GPU verifikacija je E2E:
+These tests are intentionally fast — they do NOT run inference (except the skip-if-GPU
+tolerant metadata loading). Full GPU verification is E2E:
 docs/models_report.md §6.
 """
 
@@ -42,7 +42,7 @@ class TestModelIntegration:
         assert all(m.model_type in (ModelType.LLM,) for m in models)
 
     def test_qwen_capabilities_for_agents(self):
-        """Qwen2.5-Coder mora imati tool_calling (agent sistem ga koristi)."""
+        """Qwen2.5-Coder must have tool_calling (the agent system uses it)."""
         from ai.models.discovery import discover_all_models
 
         models = discover_all_models(
@@ -55,7 +55,7 @@ class TestModelIntegration:
         assert qwen.capabilities.function_calling is True
         assert qwen.capabilities.structured_output is True
 
-    @pytest.mark.skipif(not _llama_available(), reason="llama-cpp-python nije instaliran")
+    @pytest.mark.skipif(not _llama_available(), reason="llama-cpp-python is not installed")
     def test_gpu_offload_support(self):
         """CUDA wheel podrzava GPU offload (RTX 3080 10GB)."""
         from ai.models.model_loader import (
@@ -64,18 +64,18 @@ class TestModelIntegration:
         )
 
         if not is_gpu_available():
-            pytest.skip("GPU nije dostupan na ovom okruzenju")
+            pytest.skip("GPU is not available in this environment")
         layers = detect_optimal_gpu_layers()
         assert layers >= 999  # full offload
 
     def test_settings_inference_params(self):
-        """Params iz settings.json moraju biti korektni (n_ctx 4096, threads 8)."""
+        """Params from settings.json must be correct (n_ctx 4096, threads 8)."""
         from core.config_manager import ConfigManager
 
         config = ConfigManager()
         n_ctx = config.get("ai.n_ctx", 512)
         config.get("ai.max_tokens", 204)
-        # Korisnikove postavke: 4096/1024 (faza 6.3). Defaultovi su nizi.
+        # User settings: 4096/1024 (phase 6.3). Defaults are lower.
         if n_ctx <= 512:
             pytest.skip("Lokalne settings.json sa starim vrednostima — preskacemo")
         assert config.get("ai.n_ctx") >= 4096

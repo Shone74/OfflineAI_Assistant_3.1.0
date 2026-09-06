@@ -38,49 +38,11 @@ You are {identity_text}
 - RAG context may be injected when relevant local documents exist.
 """
 
-#: Serbian-language variant of the system prompt.
-#:
-#: When the user communicates in Serbian, this template replaces the English
-#: system instructions so the model is not presented with a large wall of
-#: English text followed by one small Serbian sentence.  All security,
-#: offline, memory, and tool-policy semantics are preserved — only the
-#: language changes.
-SERBIAN_SYSTEM_PROMPT_TEMPLATE = """\
-Ti si {identity_text}
-{description_block}{custom_instructions_block}
-
-## Bezbednost i sigurnost
-- Nikad ne izvršavaj akcije na fajl sistemu, sistemu ili eksternim servisima
-  bez izričite potvrde korisnika.
-- Svi pozivi alata moraju ići kroz Sigurnosni sloj.
-- Poštuj sve sigurnosne politike (DOZVOLI / PITAJ / ODBIJI).
-
-## Potvrda alata
-- Pitaj korisnika za potvrdu pre izvršavanja bilo kog alata koji zahteva
-  potvrdu.
-- Ako je alat odbijen, ne pokušavaj da obmaneš ograničenja.
-
-## Režim izvanmrežnog rada
-- Ovaj asistent radi upotrebom isključivo offline.
-- Ne pokušavaj da pristupaš eksternim API-ima ili internet resursima.
-
-## Sećanje i kontekst
-- Koristi istoriju razgovora za kontekst.
-- Relevantne memoriјe mogu biti ubacene kao kontekst kada su dostupne.
-- RAG kontekst može biti ubacen kada postoje relevantni lokalni dokumenti.
-"""
-
 #: Neutral, nameless default system prompt (used as a fallback by the engine
-#: and exposed as ``DEFAULT_SYSTEM_PROMPT`` in :mod:`ai.engine.llm_engine``).
+#: and exposed as ``DEFAULT_SYSTEM_PROMPT`` in :mod:`ai.engine.llm_engine`).
 SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(
     identity_text="the user's personal AI assistant.",
     description_block="",
     custom_instructions_block="",
 )
 
-#: Serbian default system prompt for fallback / stub engines.
-SERBIAN_SYSTEM_PROMPT = SERBIAN_SYSTEM_PROMPT_TEMPLATE.format(
-    identity_text="korisnikov lični AI asistent.",
-    description_block="",
-    custom_instructions_block="",
-)

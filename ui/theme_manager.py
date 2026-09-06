@@ -1,13 +1,13 @@
-"""Theme manager — primenjuje QSS iz dizajn sistema (ui/design).
+"""Theme manager — applies QSS from the design system (ui/design).
 
-Zvanična tema je "Graphite + Emerald" u dva režima (docs/design_system.md):
-- ``grey_emerald`` — WORKSPACE režim (glavna aplikacija; svetlija varijanta)
-- ``installer``     — INSTALLER režim (wizard; tamnija varijanta)
-- ``dark``         — alias za INSTALLER režim (legacy kompatibilnost)
+The official theme is "Graphite + Emerald" in two modes (docs/design_system.md):
+- ``grey_emerald`` — WORKSPACE mode (main application; lighter variant)
+- ``installer``     — INSTALLER mode (wizard; darker variant)
+- ``dark``         — alias for the INSTALLER mode (legacy compatibility)
 
-Legacy teme ``light`` i ``cyber`` su uklonjene u korist zvaničnog dizajna.
+The legacy themes ``light`` and ``cyber`` were removed in favor of the official design.
 
-Aktivna tema se perzistira u ``settings.json`` pod ``ui.theme``.
+The active theme is persisted in ``settings.json`` under ``ui.theme``.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from ui.design.qss import build_full_qss
 
 ThemeName = Literal["dark", "grey_emerald", "installer", "workspace"]
 
-# Mapa imena teme -> režim palete (design tokens)
+# Map of theme name -> palette mode (design tokens)
 _THEME_PALETTE: dict[str, str] = {
     "dark": "installer",
     "grey_emerald": "workspace",
@@ -29,7 +29,7 @@ _THEME_PALETTE: dict[str, str] = {
     "workspace": "workspace",
 }
 
-# Keš generisanih stylesheet-ova
+# Cache of generated stylesheets
 _QSS_CACHE: dict[str, str] = {}
 
 
@@ -41,7 +41,7 @@ def _stylesheet_for(theme: str) -> str:
 
 
 def get_theme_palette(theme: str) -> Palette:
-    """Vraća Palette objekat (iz tokens) za datu temu."""
+    """Returns the Palette object (from tokens) for the given theme."""
     return WORKSPACE if _THEME_PALETTE.get(theme) == "workspace" else INSTALLER
 
 
@@ -55,7 +55,7 @@ class ThemeManager:
 
     def apply(self, theme: ThemeName) -> None:
         if theme not in _THEME_PALETTE:
-            # Legacy imena ("light", "cyber") mapiramo na zvaničnu temu
+            # Legacy names ("light", "cyber") are mapped to the official theme
             theme = "grey_emerald"
         self._app.setStyleSheet(_stylesheet_for(theme))
         self._theme = theme  # type: ignore[assignment]
@@ -66,5 +66,5 @@ class ThemeManager:
 
     @property
     def palette(self) -> Palette:
-        """Aktivna Palette (tokens) — za komponente kojima trebaju boje direktno."""
+        """Active Palette (tokens) — for components that need colors directly."""
         return get_theme_palette(self._theme)

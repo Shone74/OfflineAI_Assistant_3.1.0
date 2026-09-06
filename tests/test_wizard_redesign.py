@@ -1,4 +1,4 @@
-"""Testovi Faze 5: wizard redizajn (dinamicki step indikator + realna instalacija)."""
+"""Phase 5 tests: wizard redesign (dynamic step indicator + real installation)."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class TestStepHighlight:
         wizard.close()
 
     def test_highlight_connected_to_currentIdChanged(self, qapp):
-        """Promena stranice preko Qt signala azurira highlight."""
+        """A page change via a Qt signal updates the highlight."""
         wizard = _make_wizard(qapp)
         wizard.show()
         wizard.setCurrentId(1)
@@ -82,7 +82,7 @@ class TestRealInstallation:
         page._models_location = str(PROJECT_LLM_DIR)
 
         app_result = page._real_step_app()
-        assert "folderi" in app_result.lower()
+        assert "folders" in app_result.lower()
 
         deps_result = page._real_step_dependencies()
         assert len(deps_result) > 0
@@ -116,7 +116,7 @@ class TestRealInstallation:
         page = _make_installation_page(qapp)
         page._cancelled = True
         page._on_cancelled_ui()
-        assert page._task_title.text() == "Instalacija otkazana"
+        assert page._task_title.text() == "Installation cancelled"
         assert page._progress_bar.value() == 0
 
     def test_full_installation_completes(self, qapp):
@@ -130,7 +130,7 @@ class TestRealInstallation:
         for _ in range(100):
             page._tick_installation()
             if page._progress >= 100:
-                page._tick_installation()  # final tick trigeruje complete
+                page._tick_installation()  # the final tick triggers completion
                 break
         assert completed == [True]
-        assert len(page._install_results) == 5  # svaka faza dala rezultat
+        assert len(page._install_results) == 5  # every phase produced a result

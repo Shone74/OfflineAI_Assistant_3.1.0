@@ -1315,7 +1315,7 @@ class MainWindow(QMainWindow):
 
         privacy = QLabel(
             "🔒 Local AI\n"
-            "Your data stays on this device."
+            "Your data is safe here."
         )
 
         privacy.setStyleSheet(

@@ -1,152 +1,152 @@
-# Design System — "Graphite + Emerald" (Zvanična tema)
+# Design System — "Graphite + Emerald" (Official Theme)
 
-**Izvor istine:** `Izgled Aplikaccije/*.py` (HTML preview-i + PySide6 workspace prototip)
-**Namena:** Referenca za FAZU 2 (tokens.py / qss.py / components.py). Ništa u ovom dokumentu se ne izmišlja — sve je izvučeno iz preview fajlova.
+**Source of truth:** `Izgled Aplikaccije/*.py` (HTML previews + PySide6 workspace prototype)
+**Purpose:** Reference for PHASE 2 (tokens.py / qss.py / components.py). Nothing in this document is invented — everything is extracted from the preview files.
 
 ---
 
-## 1. Dva režima palete
+## 1. Two palette modes
 
-Zvanični dizajn koristi **dve varijante** Graphite+Emerald teme:
+The official design uses **two variants** of the Graphite+Emerald theme:
 
-| Režim | Gde se koristi | Površina | Emerald |
+| Mode | Where it is used | Surface | Emerald |
 |---|---|---|---|
-| **Installer/Wizard** (tamniji, zeleniji) | Welcome → Complete ekran čarobnjaka | `#151819` | `#1D8A68` |
-| **Workspace** (svetliji) | Glavna aplikacija nakon instalacije | `#202326` | `#27C48A` |
+| **Installer/Wizard** (darker, greener) | Welcome → Complete wizard screens | `#151819` | `#1D8A68` |
+| **Workspace** (lighter) | Main application after installation | `#202326` | `#27C48A` |
 
-Odluka (korak 2.4b): oba režima žive u `tokens.py`; wizard koristi installer režim, AppShell workspace režim.
+Decision (step 2.4b): both modes live in `tokens.py`; the wizard uses the installer mode, AppShell the workspace mode.
 
 ---
 
-## 2. Installer/Wizard paleta (kompletne vrednosti)
+## 2. Installer/Wizard palette (complete values)
 
-### Površine i borderi
-| Uloga | Hex |
+### Surfaces and borders
+| Role | Hex |
 |---|---|
 | Page background | `#0D1010` |
-| Glavni surface (installer prozor) | `#151819` |
+| Main surface (installer window) | `#151819` |
 | Sidebar | `#111516` |
-| Kartica | `#1C2221` |
-| Tamna kartica | `#191F1E` |
-| Border kartice | `#29302E` |
-| Border sidebar-a | `#202624` |
-| Border bottom trake | `#252B29` |
-| Border inputa/sekundarne dugmadi | `#343C39` |
-| Input pozadina | `#151819` |
-| Hover sekundarne pozadine | `#202624`, `#29302E` |
+| Card | `#1C2221` |
+| Dark card | `#191F1E` |
+| Card border | `#29302E` |
+| Sidebar border | `#202624` |
+| Bottom bar border | `#252B29` |
+| Input/secondary button border | `#343C39` |
+| Input background | `#151819` |
+| Secondary hover background | `#202624`, `#29302E` |
 
-### Emerald akcenti
-| Uloga | Hex |
+### Emerald accents
+| Role | Hex |
 |---|---|
-| Primarna boja (dugmad, logo, progress) | `#1D8A68` |
-| Hover primarne | `#249E78` |
-| Emerald tekst (current step, statusi) | `#62C7A3` |
-| Success pozadina (✓ ikonice) | `#245846` |
-| Success tekst | `#7DE0B7` |
+| Primary color (buttons, logo, progress) | `#1D8A68` |
+| Primary hover | `#249E78` |
+| Emerald text (current step, statuses) | `#62C7A3` |
+| Success background (✓ icons) | `#245846` |
+| Success text | `#7DE0B7` |
 | Success swatch | `#45B88A` |
-| Logo tekst | `#E8FFF6` |
+| Logo text | `#E8FFF6` |
 | Emerald tints | `rgba(29,138,104, 0.06–0.35)` |
 
-### Tekst
-| Uloga | Hex |
+### Text
+| Role | Hex |
 |---|---|
-| Primarni | `#EDF3F0` |
-| Sekundarni | `#A5AFAB` |
-| Opisni | `#8C9692` |
+| Primary | `#EDF3F0` |
+| Secondary | `#A5AFAB` |
+| Descriptive | `#8C9692` |
 | Muted | `#737D79` |
-| Dark (neaktivni koraci) | `#59625F` |
+| Dark (inactive steps) | `#59625F` |
 
-### Status boje
+### Status colors
 | Status | Hex / rgba |
 |---|---|
 | Success | `#62C7A3` / tint `rgba(69,184,138,0.12)` |
-| Warning | `#D6A24A` / tint `rgba(214,162,74,0.07–0.20)` / tekst `#AFA08A` |
+| Warning | `#D6A24A` / tint `rgba(214,162,74,0.07–0.20)` / text `#AFA08A` |
 | Error | `#D96565` |
 
 ---
 
-## 3. Workspace paleta (glavna aplikacija)
+## 3. Workspace palette (main application)
 
-| Uloga | Hex |
+| Role | Hex |
 |---|---|
-| `GRAPHITE` (glavni bg, topbar) | `#202326` |
-| `GRAPHITE_LIGHT` (kartice, hover) | `#292D31` |
+| `GRAPHITE` (main bg, topbar) | `#202326` |
+| `GRAPHITE_LIGHT` (cards, hover) | `#292D31` |
 | `GRAPHITE_DARK` (sidebar, context panel) | `#181A1D` |
 | `BORDER` | `#373C41` |
-| `EMERALD` (primarna) | `#27C48A` |
+| `EMERALD` (primary) | `#27C48A` |
 | `EMERALD_DARK` (hover) | `#1E9D70` |
 | `TEXT_PRIMARY` | `#F1F3F4` |
 | `TEXT_SECONDARY` | `#A8AFB5` |
 | `RED` | `#E35D6A` |
 | `YELLOW` | `#D9B44A` |
-| Tekst na primary dugmetu | `#101513` |
+| Text on primary button | `#101513` |
 
 ---
 
-## 4. Tipografija
+## 4. Typography
 
-- **Font:** "Segoe UI" (celi dizajn)
-- Wizard: naslovi 25–29px/500, opisi 11–14px, kartice-title 8px/uppercase/letter-spacing 0.4px, vrednosti 10px/600, dugmad 11px
-- Workspace: `page_title` 22pt/600, `assistant_name` 16pt/600, `section_title` 12pt/600, telo 10pt
-- Upozorenje: trenutni ThemeManager globalno postavlja 12pt — preveliko u odnosu na dizajn (ispravka u fazi 2)
+- **Font:** "Segoe UI" (entire design)
+- Wizard: titles 25–29px/500, descriptions 11–14px, card titles 8px/uppercase/letter-spacing 0.4px, values 10px/600, buttons 11px
+- Workspace: `page_title` 22pt/600, `assistant_name` 16pt/600, `section_title` 12pt/600, body 10pt
+- Warning: the current ThemeManager globally sets 12pt — too large relative to the design (fix in phase 2)
 
 ---
 
-## 5. Komponente (spisak za components.py)
+## 5. Components (list for components.py)
 
-| Komponenta | Spec |
+| Component | Spec |
 |---|---|
-| **Installer prozor** | 900×600, radius 12, senka `0 25px 70px rgba(0,0,0,0.55)` |
-| **Sidebar (wizard)** | 245px, brand logo 42×42 radius 10 emerald, steps lista (default/completed/current stanja) |
-| **Step stanja** | default tekst `#59625F`; completed `#A5AFAB` + ikonica `#245846`/`#7DE0B7` ✓; current `#62C7A3` + bg `rgba(29,138,104,0.12)` + ikonica `#1D8A68` bela |
-| **Kartica** | bg `#1C2221`/`#191F1E`, border `#29302E`, radius 7–9 |
+| **Installer window** | 900×600, radius 12, shadow `0 25px 70px rgba(0,0,0,0.55)` |
+| **Sidebar (wizard)** | 245px, brand logo 42×42 radius 10 emerald, steps list (default/completed/current states) |
+| **Step states** | default text `#59625F`; completed `#A5AFAB` + icon `#245846`/`#7DE0B7` ✓; current `#62C7A3` + bg `rgba(29,138,104,0.12)` + icon `#1D8A68` white |
+| **Card** | bg `#1C2221`/`#191F1E`, border `#29302E`, radius 7–9 |
 | **Badge** (RECOMMENDED) | bg `rgba(29,138,104,0.18)`, `#62C7A3`, 8px/700, letter-spacing 0.5 |
 | **Status chip** | READY emerald / LIMITED warning `#D6A24A`, uppercase 9px, letter-spacing 0.4 |
-| **Banner** (success/info/warning) | radius 8, tint pozadine 0.07–0.08 + border 0.18–0.35 |
-| **Storage bar** | visina 4px, track `#29302E`, fill `#1D8A68` |
-| **Progress bar** | visina 7px, radius 5, track `#29302E`, fill `#1D8A68`, procenat `#62C7A3` |
-| **Spinner** | 27px krug, border 3px `#29302E`, top `#1D8A68`, spin 1s |
-| **Install-step chipovi** | done: `#62C7A3` + border `rgba(29,138,104,0.35)`; active: tint 0.08 + border 0.55 |
-| **Capability chip** | aktivan `rgba(29,138,104,0.14)`/`#62C7A3` "✓"; neaktivan `rgba(89,98,95,0.12)`/`#59625F` "✕" |
-| **Primary dugme** | bg emerald, hover tamnije, weight 600, radius 6, padding 9×17–20 |
-| **Secondary dugme** | transparentno, tekst `#A5AFAB`, border `#343C39` |
-| **Disabled dugme** | bg `#202624`, `#59625F`, border `#29302E` |
+| **Banner** (success/info/warning) | radius 8, bg tint 0.07–0.08 + border 0.18–0.35 |
+| **Storage bar** | height 4px, track `#29302E`, fill `#1D8A68` |
+| **Progress bar** | height 7px, radius 5, track `#29302E`, fill `#1D8A68`, percentage `#62C7A3` |
+| **Spinner** | 27px circle, border 3px `#29302E`, top `#1D8A68`, spin 1s |
+| **Install-step chips** | done: `#62C7A3` + border `rgba(29,138,104,0.35)`; active: tint 0.08 + border 0.55 |
+| **Capability chip** | active `rgba(29,138,104,0.14)`/`#62C7A3` "✓"; inactive `rgba(89,98,95,0.12)`/`#59625F` "✕" |
+| **Primary button** | emerald bg, darker hover, weight 600, radius 6, padding 9×17–20 |
+| **Secondary button** | transparent, text `#A5AFAB`, border `#343C39` |
+| **Disabled button** | bg `#202624`, `#59625F`, border `#29302E` |
 | **Input** | bg `#151819`, border `#343C39`, radius 5; workspace: bg `#292D31`, border `#373C41` radius 7, focus border emerald |
-| **Topbar** | bg GRAPHITE, border-bottom BORDER; ☰ + ime asistenta (12pt/600) + stretch + "● Local" (emerald, 600) + Context + ⚙ |
-| **Sidebar (workspace)** | GRAPHITE_DARK, border-right; ime asistenta (13pt emerald), nav dugmad transparent radius 6 padding 10×12, hover GRAPHITE_LIGHT, selected: emerald tekst |
-| **Context panel** | GRAPHITE_DARK, border-left; sekcije Assistant/AI Model/Capabilities/Memory + 🔒 privacy footer (emerald) |
+| **Topbar** | bg GRAPHITE, border-bottom BORDER; ☰ + assistant name (12pt/600) + stretch + "● Local" (emerald, 600) + Context + ⚙ |
+| **Sidebar (workspace)** | GRAPHITE_DARK, border-right; assistant name (13pt emerald), nav buttons transparent radius 6 padding 10×12, hover GRAPHITE_LIGHT, selected: emerald text |
+| **Context panel** | GRAPHITE_DARK, border-left; sections Assistant/AI Model/Capabilities/Memory + 🔒 privacy footer (emerald) |
 
 ---
 
-## 6. Layout strukture
+## 6. Layout structures
 
-### Wizard (7 ekrana, 900×600)
+### Wizard (7 screens, 900×600)
 `Welcome → System Check → AI Model → Locations → Summary → Installation → Complete`
-- Levo sidebar 245px (brand + steps + "100% Offline" footer)
-- Desno content (padding 30–42px) + bottom traka (verzija levo, dugmad desno)
+- Left sidebar 245px (brand + steps + "100% Offline" footer)
+- Right content (padding 30–42px) + bottom bar (version on the left, buttons on the right)
 
 ### Workspace (1500×900)
-- **Topbar** (puna širina)
+- **Topbar** (full width)
 - **QSplitter:** `[sidebar 240px | pages (QStackedWidget) | context 280px]`
 - Sidebar nav: Home(🏠), Chat(💬), Memory(🧠), Knowledge(📚), Capabilities(🧩), Projects(🗂) + New Conversation + My Profile + Settings
-- Context panel sekcije: Assistant (ime, "Balanced · Serbian"), AI Model (ime, "● Ready · GPU"), Capabilities lista, Memory ("N relevant memories"), footer "🔒 Local AI — Your data stays on this device"
-- Chat strana: header (ime + ● Local AI), poruke (ime asistenta emerald, HTML), capability dugmad (📎 Files, 🖼 Vision, 🧠 Memory), input + ➤ send (55px, emerald, tekst `#101513`)
+- Context panel sections: Assistant (name, "Balanced · Serbian"), AI Model (name, "● Ready · GPU"), Capabilities list, Memory ("N relevant memories"), footer "🔒 Local AI — Your data stays on this device"
+- Chat page: header (name + ● Local AI), messages (assistant name in emerald, HTML), capability buttons (📎 Files, 🖼 Vision, 🧠 Memory), input + ➤ send (55px, emerald, text `#101513`)
 
 ---
 
-## 7. QSS selektori (objectName konvencija iz workspace prototipa)
+## 7. QSS selectors (objectName convention from the workspace prototype)
 
 `#topbar`, `#sidebar`, `#context_panel`, `#nav_button`, `#primary_button`, `#secondary_button`, `#status_local`, `#page_title`, `#section_title`, `#assistant_name`, `#assistant_card`, `#nav_list`
 
 ---
 
-## 8. Stanje implementacije vs dizajn (gap sažetak)
+## 8. Implementation state vs design (gap summary)
 
-| Oblast | Stanje | Šta treba |
+| Area | State | What is needed |
 |---|---|---|
-| ThemeManager `grey_emerald`/`dark` | koristi wizard paletu, hardkodirano | izvodi iz tokens.py; dodati workspace režim |
-| AppShell | strukturno veran (splitter, objectNames) ali hardkodirana workspace paleta, ignoriše ThemeManager | topbar, toggle dugmad, selected stanja, ThemeManager integracija |
-| WelcomeWizard (1743 lin.) | sva 7 koraka implementirana, wizard paleta | dinamički step highlight, custom bottom bar, deljene komponente |
-| home_page StatusCard | wizard paleta (`#1C2221`) | workspace paleta kartica (`#292D31`) |
-| Deljene komponente | ne postoje (sve inline) | components.py biblioteka |
-| main_window.py (1591 lin.) | arhitekturno drugačiji (statusbar, meni) | funkcionalnost migrira u AppShell (faza 4), ne stilizovati ga |
+| ThemeManager `grey_emerald`/`dark` | uses the wizard palette, hardcoded | derive from tokens.py; add the workspace mode |
+| AppShell | structurally faithful (splitter, objectNames) but hardcoded workspace palette, ignores ThemeManager | topbar, toggle buttons, selected states, ThemeManager integration |
+| WelcomeWizard (1743 lines) | all 7 steps implemented, wizard palette | dynamic step highlight, custom bottom bar, shared components |
+| home_page StatusCard | wizard palette (`#1C2221`) | workspace card palette (`#292D31`) |
+| Shared components | do not exist (all inline) | components.py library |
+| main_window.py (1591 lines) | architecturally different (statusbar, menu) | migrate functionality into AppShell (phase 4), do not style it |

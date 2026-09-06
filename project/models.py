@@ -1,4 +1,4 @@
-"""Project and Workspace models for FAZA 13.4."""
+"""Project and Workspace models for Phase 13.4."""
 
 from __future__ import annotations
 

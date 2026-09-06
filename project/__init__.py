@@ -1,4 +1,4 @@
-"""Project and Workspace management for FAZA 13.4.
+"""Project and Workspace management for Phase 13.4.
 
 This package provides project and workspace management with profile overrides.
 

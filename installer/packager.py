@@ -1,4 +1,4 @@
-"""Installer packaging support for FAZA 12.
+"""Installer packaging support for Phase 12.
 
 Generates PyInstaller spec files and Inno Setup script templates
 so the application can be bundled into a Windows installer.

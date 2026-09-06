@@ -1,20 +1,21 @@
-"""QSS builder — generiše stylesheet-ove iz design tokens-a.
+﻿"""QSS builder — generates stylesheets from design tokens.
 
-Nijedan QSS string ovde ne sadrži hardkodirane hex vrednosti; sve dolazi
-iz ``ui.design.tokens``. Selektori prate objectName konvencije iz
-workspace prototipa (#topbar, #sidebar, #nav_button, #primary_button...).
+No QSS string here contains hardcoded hex values; everything comes
+from ``ui.design.tokens``. Selectors follow the objectName conventions from
+the workspace prototype (#topbar, #sidebar, #nav_button, #primary_button...).
 """
 
 from __future__ import annotations
 
-from ui.design.tokens import FONT_FAMILY, Palette
+from ui.design.tokens import FONT_BODY, FONT_FAMILY, Palette
 
 
 def _base(p: Palette) -> str:
-    """Globalni base stylesheet za dati režim palete."""
+    """Global base stylesheet for the given palette mode."""
     return f"""
 * {{
     font-family: "{FONT_FAMILY}";
+    font-size: {FONT_BODY}pt;
     outline: none;
 }}
 QMainWindow, QWidget#page_root {{
@@ -112,7 +113,7 @@ QToolTip {{
 
 
 def shell_qss(p: Palette) -> str:
-    """QSS za AppShell strukturu (topbar, sidebar, context panel, stranice)."""
+    """QSS for the AppShell structure (topbar, sidebar, context panel, pages)."""
     return f"""
 /* ---------------- Topbar ---------------- */
 QFrame#topbar {{
@@ -160,7 +161,7 @@ QLabel#sidebar_subtitle {{
 }}
 QLabel#sidebar_section {{
     color: {p.text_muted};
-    font-size: 8pt;
+    font-size: 9pt;
     font-weight: 700;
     background: transparent;
 }}
@@ -170,7 +171,7 @@ QPushButton#nav_button {{
     border-radius: 6px;
     padding: 10px 12px;
     color: {p.text_secondary};
-    font-size: 10pt;
+    font-size: 11pt;
     text-align: left;
 }}
 QPushButton#nav_button:hover {{
@@ -203,7 +204,7 @@ QFrame#context_panel {{
 }}
 QLabel#context_section_title {{
     color: {p.text_muted};
-    font-size: 8pt;
+    font-size: 9pt;
     font-weight: 700;
 }}
 QLabel#context_value {{
@@ -215,7 +216,7 @@ QLabel#context_privacy {{
     background: transparent;
 }}
 
-/* ---------------- Stranice ---------------- */
+/* ---------------- Pages ---------------- */
 QLabel#page_title {{
     color: {p.text_primary};
     font-size: 22pt;
@@ -233,7 +234,7 @@ QLabel#section_title {{
     background: transparent;
 }}
 
-/* ---------------- Kartice ---------------- */
+/* ---------------- Cards ---------------- */
 QFrame#card, QFrame#assistant_card {{
     background: {p.surface_card};
     border: 1px solid {p.border};
@@ -244,7 +245,7 @@ QFrame#card:hover {{
 }}
 QLabel#card_title {{
     color: {p.text_muted};
-    font-size: 8pt;
+    font-size: 9pt;
     font-weight: 700;
     background: transparent;
 }}
@@ -295,7 +296,7 @@ QPushButton#danger_button:hover {{
 
 
 def buttons_qss(p: Palette) -> str:
-    """Samo dugmad — za dijaloge/stranice koje ne koriste ceo shell_qss."""
+    """Buttons only — for dialogs/pages that don't use the full shell_qss."""
     return f"""
 QPushButton#primary_button {{
     background: {p.emerald};
@@ -328,7 +329,7 @@ QPushButton#secondary_button:hover {{
 
 
 def chat_qss(p: Palette) -> str:
-    """Chat stranica — poruke, capability dugmad, input red."""
+    """Chat page — messages, capability buttons, input row."""
     return f"""
 QTextEdit#chat_view {{
     background: {p.surface};
@@ -456,7 +457,7 @@ QProgressBar#install_progress::chunk {{
 
 
 def build_full_qss(palette_name: str) -> str:
-    """Kompletan QSS za dati režim ('workspace' | 'installer')."""
+    """Complete QSS for the given mode ('workspace' | 'installer')."""
     from ui.design.tokens import get_palette
 
     p = get_palette(palette_name)

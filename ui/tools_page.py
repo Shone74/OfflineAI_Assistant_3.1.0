@@ -95,12 +95,12 @@ class _ToolCard(QFrame):
 
         name_label = QLabel(self._tool_data.get("name", "Unknown Tool"))
         name_label.setStyleSheet(
-            f"color: {_TEXT_PRIMARY}; font-size: 13px; font-weight: 600;"
+            f"color: {_TEXT_PRIMARY}; font-size: 15px; font-weight: 600;"
         )
         text_layout.addWidget(name_label)
 
         desc_label = QLabel(self._tool_data.get("description", ""))
-        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         desc_label.setWordWrap(True)
         text_layout.addWidget(desc_label)
 
@@ -108,25 +108,25 @@ class _ToolCard(QFrame):
         meta_layout.setSpacing(8)
 
         category_label = QLabel(f"📂 {self._tool_data.get('category', 'general')}")
-        category_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px;")
+        category_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         meta_layout.addWidget(category_label)
 
         version_label = QLabel(f"v{self._tool_data.get('version', '0.0.0')}")
-        version_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px;")
+        version_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         meta_layout.addWidget(version_label)
 
         offline_label = QLabel("🟢 Offline" if self._tool_data.get("offline", True) else "🌐 Online")
-        offline_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px;")
+        offline_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         meta_layout.addWidget(offline_label)
 
         trust_val = self._tool_data.get("trust_level", "unverified")
         trust_label = QLabel(f"🛡 {ToolTrust(trust_val).display_name if trust_val in [t.value for t in ToolTrust] else trust_val}")
-        trust_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px;")
+        trust_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         meta_layout.addWidget(trust_label)
 
         if self._is_external:
             source_label = QLabel("📦 External")
-            source_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px;")
+            source_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
             meta_layout.addWidget(source_label)
 
         meta_layout.addStretch()
@@ -139,7 +139,7 @@ class _ToolCard(QFrame):
         status_color = _STATUS_COLORS.get(status, _TEXT_MUTED)
         status_label = QLabel(status_display)
         status_label.setStyleSheet(
-            f"color: {status_color}; font-size: 11px; font-weight: 600;"
+            f"color: {status_color}; font-size: 13px; font-weight: 600;"
         )
         layout.addWidget(status_label)
 
@@ -243,7 +243,7 @@ def _btn_style(bg: str = "#3A3F40") -> str:
         bg = _PALETTE.surface_card
     return (
         f"QPushButton {{ background: {bg}; color: {_TEXT_PRIMARY};"
-        f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px; font-size: 10px; }}"
+        f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px; font-size: 11px; }}"
         f"QPushButton:hover {{ background: {_EMERALD}; }}"
     )
 
@@ -298,21 +298,21 @@ class ToolsPage(QWidget):
 
         self._model_label = QLabel("Current model: N/A")
         self._model_label.setStyleSheet(
-            f"color: {_TEXT_SECONDARY}; font-size: 12px;"
+            f"color: {_TEXT_SECONDARY}; font-size: 13px;"
         )
         header.addWidget(self._model_label)
         layout.addLayout(header)
 
         filter_layout = QHBoxLayout()
         filter_label = QLabel("Filter:")
-        filter_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
+        filter_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px;")
         filter_layout.addWidget(filter_label)
 
         self._filter_combo = QComboBox()
         self._filter_combo.setFixedHeight(24)
         self._filter_combo.setStyleSheet(
             f"QComboBox {{ background: {_GRAPHITE_CARD}; color: {_TEXT_PRIMARY};"
-            f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px; font-size: 11px; }}"
+            f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px; font-size: 13px; }}"
         )
         self._filter_combo.addItems([
             "All Tools",
@@ -468,7 +468,7 @@ class ToolsPage(QWidget):
 
         if self._evaluator is None:
             no_tools = QLabel("No tool registry is configured.")
-            no_tools.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 14px;")
+            no_tools.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 15px;")
             self._container_layout.addWidget(no_tools)
             return
 
@@ -476,7 +476,7 @@ class ToolsPage(QWidget):
         all_tools = self._evaluator.list_all_with_status() if self._evaluator else []
         if not all_tools:
             no_tools = QLabel("No tools are registered in the arsenal.")
-            no_tools.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 14px;")
+            no_tools.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 15px;")
             self._container_layout.addWidget(no_tools)
             return
 

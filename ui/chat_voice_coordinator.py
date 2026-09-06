@@ -1,21 +1,22 @@
-"""Chat + Voice koordinator za AppShell (Faza 7).
+"""Chat + Voice coordinator for AppShell (Phase 7).
 
-Rešava dva problema iz audita (docs/current_status.md — Faza 7):
-1. ChatWidget u AppShell-u nije bio povezan ni na Assistant (send_requested
-   bez konzumenta — poruke su završavale u skrivenom MainWindow chat-u) ni
-   na VoiceManager (REC dugme mrtvo).
-2. Nema eksplicitnog Automatic Listening (continuous conversation) moda.
+Fixes two problems from the audit (docs/current_status.md — Phase 7):
+1. ChatWidget in AppShell was not connected to the Assistant (send_requested
+   without a consumer — messages ended up in the hidden MainWindow chat) nor
+   to the VoiceManager (REC button dead).
+2. There was no explicit Automatic Listening (continuous conversation) mode.
 
-Integracija prati isti obrazac koji koristi MainWindow (worker → Qt signal
-(queued) → GUI-thread slot → tek onda EventBus publish), tako da su svi Qt
-pozivi na GUI thread-u.
+The integration follows the same pattern used by MainWindow (worker → Qt
+signal (queued) → GUI-thread slot → only then EventBus publish), so all Qt
+calls stay on the GUI thread.
 
-Voice state machine (specifikacija §4):
-    IDLE → LISTENING → PROCESSING → SPEAKING → LISTENING → ... (petlja)
-    bilo koje stanje → STOPPING → IDLE (korisnički izlaz)
+Voice state machine (specification §4):
+    IDLE → LISTENING → PROCESSING → SPEAKING → LISTENING → ... (loop)
+    any state → STOPPING → IDLE (user exit)
 
-Echo zaštita: tokom SPEAKING mikrofon se NE otvara (polu-dupleks pristup —
-openwakeword/AAC nije dostupan; dokumentovano u docs/current_status.md).
+Echo protection: while SPEAKING the microphone is NOT opened (half-duplex
+approach — openwakeword/AAC is not available; documented in
+docs/current_status.md).
 """
 
 from __future__ import annotations
@@ -31,18 +32,19 @@ logger = logging.getLogger(__name__)
 
 
 class _GenerationWorker(QThread):
-    """Pozadinska LLM generacija — identičan obrazac kao MainWindow worker."""
+    """Background LLM generation — same pattern as the MainWindow worker."""
 
     token_emitted = Signal(str)
     generation_finished = Signal(str)
     generation_cancelled = Signal()
     generation_failed = Signal(str)
 
-    def __init__(self, assistant: Any, text: str, cancel_event) -> None:
+    def __init__(self, assistant: Any, text: str, cancel_event, images: list | None = None) -> None:
         super().__init__()
         self._assistant = assistant
         self._text = text
         self._cancel_event = cancel_event
+        self._images = images
 
     def run(self) -> None:
         try:
@@ -61,6 +63,7 @@ class _GenerationWorker(QThread):
                 cancel_event=self._cancel_event,
                 token_callback=on_token,
                 should_cancel=should_cancel,
+                images=self._images,
             )
             if self.isInterruptionRequested():
                 self.generation_cancelled.emit()
@@ -71,17 +74,17 @@ class _GenerationWorker(QThread):
             try:
                 self.generation_failed.emit(str(exc))
             except RuntimeError:
-                pass  # worker već uništen
+                pass  # worker already destroyed
 
 
 class ChatVoiceCoordinator(QWidget):
-    """Povezuje ChatWidget, Assistant i VoiceManager unutar AppShell-a.
+    """Connects ChatWidget, Assistant, and VoiceManager within AppShell.
 
-    Public API (pozivati samo sa GUI thread-a):
-    - wire()  — poveže signale i evente (idempotentno)
-    - unwire() — odveže pre zatvaranja prozora
-    - set_automatic_listening(enabled: bool) — ulaz/izlaz iz continuous moda
-    - is_automatic_listening — trenutno stanje
+    Public API (call only from the GUI thread):
+    - wire()  — connect signals and events (idempotent)
+    - unwire() — disconnect before closing the window
+    - set_automatic_listening(enabled: bool) — enter/exit continuous mode
+    - is_automatic_listening — current state
     """
 
     def __init__(
@@ -103,29 +106,32 @@ class ChatVoiceCoordinator(QWidget):
         self._generation_worker: _GenerationWorker | None = None
         self._cancel_event: Any = None
         self._sub_ids: list[tuple[str, str]] = []
-        self._responded = False  # odgovor prikazan (start/finish streaming)
+        self._responded = False  # response shown (start/finish streaming)
 
-        # Automatic Listening state machine (specifikacija §4)
-        self._auto_listen = False           # korisnički mod (persistan) dok je ON
-        self._auto_cycle_active = False     # trenutni ciklus (listen→…→listen)
-        self._stopping = False             # STOPPING stanje — blokira re-schedule
+        # Automatic Listening state machine (specification §4)
+        self._auto_listen = False           # user mode (persistent) while ON
+        self._auto_cycle_active = False     # current cycle (listen→…→listen)
+        self._stopping = False             # STOPPING state — blocks re-scheduling
 
     # ------------------------------------------------------------------
     # Wiring
     # ------------------------------------------------------------------
 
     def wire(self) -> None:
-        """Poveže ChatWidget signale + EventBus evente (idempotentno)."""
+        """Connects ChatWidget signals + EventBus events (idempotent)."""
         if self._wired:
             return
         self._wired = True
 
-        # Chat input → generacija
+        # Chat input → generation
         self._chat.send_requested.connect(self._on_send)
+        if hasattr(self._chat, "send_with_images_requested"):
+            self._chat.send_with_images_requested.connect(self._on_send_with_images)
         self._chat.stop_generation.connect(self._on_stop_generation)
         self._chat.voice_requested.connect(self._on_voice_input)
         self._chat.play_requested.connect(self._on_play_recording)
         self._chat.automatic_listening_toggled.connect(self.set_automatic_listening)
+        self._sync_vision_availability()
 
         if self._event_bus is None:
             return
@@ -137,6 +143,9 @@ class ChatVoiceCoordinator(QWidget):
             ("VOICE_PLAY_DONE", self._on_speak_done),
             ("VOICE_ERROR", self._on_voice_error),
             ("WAKE_WORD_DETECTED", self._on_wake_word),
+            ("MODEL_LOADED", self._on_model_event),
+            ("MODEL_UNLOADED", self._on_model_event),
+            ("API_ENGINE_ACTIVE", self._on_api_engine_active),
         ]
         for event_type, handler in handlers:
             try:
@@ -146,7 +155,7 @@ class ChatVoiceCoordinator(QWidget):
                 logger.debug("subscribe %s failed", event_type, exc_info=True)
 
     def unwire(self) -> None:
-        """Odveže sve — sigurno pozvati više puta."""
+        """Disconnects everything — safe to call multiple times."""
         if self._event_bus is not None:
             for event_type, sub_id in self._sub_ids:
                 try:
@@ -157,7 +166,7 @@ class ChatVoiceCoordinator(QWidget):
         self._wired = False
 
     # ------------------------------------------------------------------
-    # Automatic Listening (specifikacija §2/§4/§5)
+    # Automatic Listening (specification §2/§4/§5)
     # ------------------------------------------------------------------
 
     @property
@@ -165,14 +174,14 @@ class ChatVoiceCoordinator(QWidget):
         return self._auto_listen
 
     def set_automatic_listening(self, enabled: bool) -> bool:
-        """Uključi/isključi continuous conversation mod (idempotentno).
+        """Enable/disable continuous conversation mode (idempotent).
 
-        ON  → odmah započinje slušanje (ako je stanje sigurno).
-        OFF → zaustavlja trenutni ciklus; nema novih automatskih sesija.
+        ON  → immediately starts listening (if the state is safe).
+        OFF → stops the current cycle; no new automatic sessions.
         """
         if enabled:
             if self._auto_listen:
-                return True  # idempotentno (§4)
+                return True  # idempotent (§4)
             self._auto_listen = True
             self._stopping = False
             logger.info("Automatic Listening: ON")
@@ -184,31 +193,32 @@ class ChatVoiceCoordinator(QWidget):
         if not self._auto_listen:
             return False
         self._auto_listen = False
-        self._stopping = True  # blokira ponovno zakazivanje (§4)
+        self._stopping = True  # blocks re-scheduling (§4)
         self._chat.set_automatic_listening_ui(False)
-        # Aktivnu sesiju prekini preko zvaničnog API-ja (definisano ponašanje)
+        # Stop the active session via the official API (defined behavior)
         if self._voice is not None:
             try:
                 if self._voice.is_recording:
-                    # Završni snimak normalno — ne bacamo korisnikov govor
+                    # Finish the recording normally — we don't throw away
+                    # the user's speech
                     self._voice.stop_and_transcribe()
                 else:
                     self._voice.stop_listening()
             except Exception:
                 logger.exception("Automatic Listening OFF — voice stop failed")
         logger.info("Automatic Listening: OFF")
-        # Zaustavljanje završeno — novi ON sme da radi cikluse
+        # Stopping finished — a new ON may run cycles
         self._stopping = False
         return False
 
     def _begin_auto_cycle(self) -> None:
-        """Započne novi slušni ciklus (samo ako je mod aktivan i stanje safe)."""
+        """Starts a new listening cycle (only if the mode is active and the state is safe)."""
         if not self._auto_listen or self._stopping:
             return
         if self._voice is None:
             return
         state = self._voice.state.value
-        # Sigurno pokretanje samo iz IDLE/ERROR (nema re-entrancy)
+        # Safe to start only from IDLE/ERROR (no re-entrancy)
         if state in ("idle", "error"):
             try:
                 ok = self._voice.begin_auto_recording()
@@ -218,8 +228,8 @@ class ChatVoiceCoordinator(QWidget):
                 logger.exception("Auto-listen begin_auto_recording failed")
                 self._on_auto_error("begin_auto_recording failed")
         else:
-            # PROCESSING/SPEAKING — ciklus se nastavlja kad se završi
-            # (hook u _on_speak_done / _on_voice_end).
+            # PROCESSING/SPEAKING — the cycle continues when they finish
+            # (hook in _on_speak_done / _on_voice_end).
             self._auto_cycle_active = True
 
     # ------------------------------------------------------------------
@@ -232,12 +242,46 @@ class ChatVoiceCoordinator(QWidget):
             return
         self._start_generation(text)
 
+    def _on_send_with_images(self, text: str, images: list) -> None:
+        """Multimodal send — images are forwarded to Assistant.process_message."""
+        if self._generation_active:
+            logger.info("Generation already active — ignoring send")
+            return
+        self._start_generation(text, images=images)
+
+    def _on_model_event(self, event_type: str, data: dict) -> None:
+        """Model changed — refresh the Vision button availability."""
+        self._sync_vision_availability()
+
+    def _on_api_engine_active(self, event_type: str, data: dict) -> None:
+        """An agent turn is served by the online API — show the indicator
+        until the generation finishes."""
+        self._set_online_indicator(True)
+
+    def _set_online_indicator(self, active: bool) -> None:
+        if self._chat is not None and hasattr(self._chat, "set_online_active"):
+            try:
+                self._chat.set_online_active(active)
+            except Exception:
+                logger.debug("set_online_active failed", exc_info=True)
+
+    def _sync_vision_availability(self) -> None:
+        """Enable Vision only when the active model supports it."""
+        if self._chat is None or not hasattr(self._chat, "set_vision_available"):
+            return
+        engine = getattr(self._assistant, "_engine", None)
+        available = bool(getattr(engine, "supports_vision", False)) if engine else False
+        try:
+            self._chat.set_vision_available(available)
+        except Exception:
+            logger.debug("set_vision_available failed", exc_info=True)
+
     def _on_stop_generation(self) -> None:
         if self._cancel_event is not None:
             self._cancel_event.set()
 
-    def _start_generation(self, text: str) -> None:
-        """Streaming generacija u pozadini — isti obrazac kao MainWindow."""
+    def _start_generation(self, text: str, images: list | None = None) -> None:
+        """Streaming generation in the background — same pattern as MainWindow."""
         if self._assistant is None:
             return
         import threading
@@ -248,7 +292,7 @@ class ChatVoiceCoordinator(QWidget):
         if hasattr(self._assistant, "_cancel_event"):
             self._assistant._cancel_event = self._cancel_event
         try:
-            worker = _GenerationWorker(self._assistant, text, self._cancel_event)
+            worker = _GenerationWorker(self._assistant, text, self._cancel_event, images)
             self._generation_worker = worker
             worker.token_emitted.connect(self._on_token)
             worker.generation_finished.connect(self._on_generation_finished)
@@ -270,6 +314,7 @@ class ChatVoiceCoordinator(QWidget):
     def _on_generation_finished(self, response: str) -> None:
         self._generation_active = False
         self._generation_worker = None
+        self._set_online_indicator(False)
         cid = f"conv-{datetime.now(UTC).isoformat()}"
         model_name = (
             self._assistant._engine.model_name
@@ -290,6 +335,7 @@ class ChatVoiceCoordinator(QWidget):
     def _on_generation_cancelled(self) -> None:
         self._generation_active = False
         self._generation_worker = None
+        self._set_online_indicator(False)
         if self._event_bus is not None:
             self._event_bus.publish("GENERATION_CANCELLED", data={"tokens_generated": 0})
         self._resume_after_response()
@@ -297,12 +343,13 @@ class ChatVoiceCoordinator(QWidget):
     def _on_generation_failed(self, error: str) -> None:
         self._generation_active = False
         self._generation_worker = None
+        self._set_online_indicator(False)
         if self._event_bus is not None:
             self._event_bus.publish("GENERATION_FAILED", data={"error": error})
         self._resume_after_response()
 
     def _maybe_speak(self, text: str) -> None:
-        """TTS ako je voice enabled — isti uslov kao MainWindow."""
+        """TTS if voice is enabled — same condition as MainWindow."""
         if (
             self._voice is not None
             and self._event_bus is not None
@@ -326,7 +373,7 @@ class ChatVoiceCoordinator(QWidget):
     # ------------------------------------------------------------------
 
     def _on_voice_input(self) -> None:
-        """REC dugme — manual push-to-talk (nešto drugo od auto-listen)."""
+        """REC button — manual push-to-talk (different from auto-listen)."""
         if self._voice is None:
             return
         self._voice.handle_mic_click()
@@ -341,7 +388,7 @@ class ChatVoiceCoordinator(QWidget):
             self._chat.set_voice_state(self._voice.state.value)
             self._chat.set_play_available(bool(self._voice.last_recording_path))
 
-    # --- EventBus handlers (GUI thread — voice manager marshalluje) -------
+    # --- EventBus handlers (GUI thread — voice manager marshals) ---------
 
     def _on_voice_start(self, event_type: str, data: dict) -> None:
         self._chat.set_voice_state("recording")
@@ -353,13 +400,13 @@ class ChatVoiceCoordinator(QWidget):
             self._chat.set_play_available(bool(self._voice.last_recording_path))
 
     def _on_voice_transcript(self, event_type: str, data: dict) -> None:
-        """VOICE_TRANSCRIPT → user poruka → generacija (auto-listen loop)."""
+        """VOICE_TRANSCRIPT → user message → generation (auto-listen loop)."""
         if self._generation_active:
             logger.info("Transcript while generation active — deferring")
             return
         text = str(data.get("text", "")).strip()
         if not text:
-            # Prazan transkript — ne generiši; nastavi ciklus ako je auto ON
+            # Empty transcript — don't generate; continue the cycle if auto is ON
             self._resume_after_response()
             return
         self._chat.add_message("user", text)
@@ -369,14 +416,14 @@ class ChatVoiceCoordinator(QWidget):
         self._chat.set_voice_state("speaking")
 
     def _on_speak_done(self, event_type: str, data: dict) -> None:
-        """TTS završen → nazad na slušanje (§2 korak 9) ako je auto mod ON."""
+        """TTS finished → back to listening (§2 step 9) if auto mode is ON."""
         self._chat.set_voice_state("idle")
         if self._voice is not None:
             self._chat.set_play_available(bool(self._voice.last_recording_path))
         self._resume_after_response()
 
     def _resume_after_response(self) -> None:
-        """Nakon odgovora/TTS → novi ciklus slušanja (auto mod)."""
+        """After response/TTS → new listening cycle (auto mode)."""
         if self._auto_listen and not self._stopping:
             self._begin_auto_cycle()
         else:
@@ -388,20 +435,21 @@ class ChatVoiceCoordinator(QWidget):
         self._on_auto_error(message)
 
     def _on_auto_error(self, message: str) -> None:
-        """Nepoporljiva greška → mod mora u konzistentno OFF stanje (§12)."""
+        """Unrecoverable error → the mode must end in a consistent OFF state (§12)."""
         if self._auto_listen:
             logger.error("Automatic Listening error → disabling: %s", message)
             self.set_automatic_listening(False)
 
     def _on_wake_word(self, event_type: str, data: dict) -> None:
-        """Wake word trigger → jedna glasovna interakcija (§6).
+        """Wake word trigger → one voice interaction (§6).
 
-        Wake word i auto-listen su NEZAVISNI modovi; wake trigger ne uključuje
-        auto mod i ne startuje mikrofon ako je auto ciklus već aktivan.
+        Wake word and auto-listen are INDEPENDENT modes; the wake trigger does
+        not enable auto mode and does not start the microphone if an auto
+        cycle is already active.
         """
         if self._voice is None:
             return
-        # Ako je auto-listen već aktivan — wake trigger je suvišan
+        # If auto-listen is already active — the wake trigger is redundant
         if self._auto_cycle_active and self._voice.state.value in ("recording",):
             return
         state = self._voice.state.value
@@ -414,7 +462,7 @@ class ChatVoiceCoordinator(QWidget):
     # ------------------------------------------------------------------
 
     def shutdown(self) -> None:
-        """Čist prekid svega (pozvati iz closeEvent)."""
+        """Clean interruption of everything (call from closeEvent)."""
         self.set_automatic_listening(False)
         if self._generation_worker is not None and self._generation_worker.isRunning():
             if self._cancel_event is not None:

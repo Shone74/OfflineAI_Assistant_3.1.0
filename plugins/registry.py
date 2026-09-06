@@ -90,4 +90,4 @@ class PluginCommandRegistry:
             return cmd.handler(args)
         except Exception as exc:
             logger.exception("Plugin command %s.%s raised", plugin_id, name)
-            return f"Greška u komandi '{name}': {exc}"
+            return f"Error in command '{name}': {exc}"

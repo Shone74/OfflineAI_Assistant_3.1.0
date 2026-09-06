@@ -1,4 +1,4 @@
-"""Memory management page — read, add, edit, delete, search and clear memories.
+﻿"""Memory management page — read, add, edit, delete, search and clear memories.
 
 Replaces the static placeholder in :mod:`ui.main_window`.  Reads from the
 existing :class:`memory.memory_manager.MemoryManager` (SQLite ``memories``
@@ -228,7 +228,7 @@ class MemoryPage(QWidget):
         layout.addLayout(header)
 
         self._banner = QLabel()
-        self._banner.setStyleSheet(f"color: {_EMERGENCY_HOVER}; font-size: 11px;")
+        self._banner.setStyleSheet(f"color: {_EMERGENCY_HOVER}; font-size: 13px;")
         self._banner.setVisible(False)
         layout.addWidget(self._banner)
 
@@ -256,7 +256,7 @@ class MemoryPage(QWidget):
         footer.addWidget(self._btn_clear)
         footer.addStretch()
         self._count_label = QLabel("")
-        self._count_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        self._count_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         footer.addWidget(self._count_label)
         layout.addLayout(footer)
 
@@ -280,14 +280,14 @@ class MemoryPage(QWidget):
     def _small_btn_css(self) -> str:
         return (
             f"QPushButton {{ padding: 2px 10px; border-radius: 5px; background: {_GRAPHITE_DARK_CARD};"
-            f" color: {_TEXT_SECONDARY}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 10px; }}"
+            f" color: {_TEXT_SECONDARY}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 11px; }}"
             f"QPushButton:hover {{ background: {_GRAPHITE_BORDER}; }}"
         )
 
     def _small_danger_btn_css(self) -> str:
         return (
             f"QPushButton {{ padding: 2px 10px; border-radius: 5px; background: {_GRAPHITE_DARK_CARD};"
-            f" color: {_DANGER}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 10px; }}"
+            f" color: {_DANGER}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 11px; }}"
             f"QPushButton:hover {{ background: rgba(217,101,101,0.12); }}"
         )
 
@@ -399,17 +399,17 @@ class MemoryPage(QWidget):
         type_badge.setStyleSheet(
             f"background: {_EMERALD_BG_TINT}; color: {_EMERALD_TEXT};"
             f"border: 1px solid {_EMERALD_BORDER_TINT}; border-radius: 8px;"
-            f"padding: 2px 8px; font-size: 10px; font-weight: 600;"
+            f"padding: 2px 8px; font-size: 11px; font-weight: 600;"
         )
         top.addWidget(type_badge)
 
         created = entry.created_at if entry.created_at else "—"
         date_label = QLabel(f"Created: {created}")
-        date_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        date_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         top.addWidget(date_label)
 
         imp_label = QLabel(f"Importance: {(entry.importance or 0.0):.2f}")
-        imp_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
+        imp_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px;")
         top.addWidget(imp_label)
 
         top.addStretch()
@@ -430,7 +430,7 @@ class MemoryPage(QWidget):
         layout.addLayout(top)
 
         content = QLabel(entry.content if entry.content else "")
-        content.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 12px;")
+        content.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px;")
         content.setWordWrap(True)
         layout.addWidget(content)
 

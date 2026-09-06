@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 
 
 _SYSTEM_TOOL_KEYWORDS = {
-    "system_info": ("specifikacija", "kakav računar", "system info", "info o sistemu"),
-    "open_application": ("otvori", "start", "pokreni", "launch"),
-    "read_file": ("pročitaj", "procitaj", "read file", "otvori fajl"),
-    "search_files": ("pretraži", "pretrazi", "search files", "pronađi"),
+    "system_info": ("system info", "system information", "specs", "cpu", "ram"),
+    "open_application": ("open", "start", "launch", "run"),
+    "read_file": ("read file", "open file"),
+    "search_files": ("search files", "find files", "search for"),
 }
 
 
@@ -113,13 +113,13 @@ class StubPlanner(Planner):
             return any(kw in lowered for kw in _SYSTEM_TOOL_KEYWORDS[tool_name])
 
         if _match("system_info"):
-            tasks.append(Task.of("Prikaži sistemske informacije", tool_name="system_info"))
+            tasks.append(Task.of("Show system information", tool_name="system_info"))
             return tasks[:max_tasks]
 
         if _match("open_application"):
             app = self._extract_app(lowered)
             tasks.append(
-                Task.of(f"Otvori {app}", tool_name="open_application", params={"program": app})
+                Task.of(f"Open {app}", tool_name="open_application", params={"program": app})
             )
             return tasks[:max_tasks]
 
@@ -127,7 +127,7 @@ class StubPlanner(Planner):
             path = self._extract_path(lowered)
             if path:
                 tasks.append(
-                    Task.of(f"Pročitaj {path}", tool_name="read_file", params={"path": path})
+                    Task.of(f"Read {path}", tool_name="read_file", params={"path": path})
                 )
             return tasks[:max_tasks]
 
@@ -135,7 +135,7 @@ class StubPlanner(Planner):
             pattern, directory = self._extract_search(lowered)
             tasks.append(
                 Task.of(
-                    f"Pretraži {pattern}",
+                    f"Search {pattern}",
                     tool_name="search_files",
                     params={"pattern": pattern, "directory": directory},
                 )
@@ -143,7 +143,7 @@ class StubPlanner(Planner):
             return tasks[:max_tasks]
 
         # Fallback: no tool matches → a plain conversational step.
-        desc = goal.strip().rstrip("?")[:80] or "Odgovori na pitanje"
+        desc = goal.strip().rstrip("?")[:80] or "Answer the question"
         tasks.append(Task.of(desc))
         return tasks[:max_tasks]
 
@@ -164,12 +164,11 @@ class StubPlanner(Planner):
     def _extract_search(lowered: str) -> tuple[str, str | None]:
         pattern = "*.txt"
         directory: str | None = None
-        dir_match = re.search(r"u\b\s+(?P<dir>[^\s]+\b)", lowered)
+        dir_match = re.search(r"\bin\b\s+(?P<dir>\S+)", lowered)
         if dir_match:
             directory = dir_match.group("dir")
         file_match = re.search(
-            r"(?:fajl|fajlovi|fajlove|fajleve|file|files|datoteka|datoteke|datotei)"
-            r"\s+(?P<pattern>\S+)",
+            r"(?:file|files)\s+(?P<pattern>\S+)",
             lowered,
         )
         # Only accept the match if the captured pattern looks like a file pattern
@@ -324,11 +323,11 @@ class LLMPlanner(Planner):
         return (
             f"{system_prompt_context}{profile_context}{project_context_str}"
             f"{memory_context_str}{knowledge_context_str}"
-            f"Razlozi sledeci cilj u maksimalno {max_tasks} koraka. "
-            f"Za svaki korak izaberi alat iz: {tool_names}. "
-            f"Odgovori iskljucivo JSON nizom objekata "
+            f"Break down the following goal into at most {max_tasks} steps. "
+            f"For each step choose a tool from: {tool_names}. "
+            f"Respond exclusively with a JSON array of objects "
             f'{{"description": str, "tool_name": str|null, "params": dict}}.\n'
-            f"Cilj: {goal}\nPlan:"
+            f"Goal: {goal}\nPlan:"
         )
 
     def _available_tools(self) -> list[str]:

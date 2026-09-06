@@ -1,4 +1,4 @@
-"""Testovi AppShell redizajna (Faza 3): topbar, toggle, selected nav, context."""
+"""AppShell redesign tests (Phase 3): topbar, toggle, selected nav, context."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class TestSidebarNavigation:
         ]
         shell = _make_shell(pages)
         for route in ("Models", "Agents", "Automation"):
-            assert route in shell._nav_buttons, f"{route} nije u navigaciji"
+            assert route in shell._nav_buttons, f"{route} is not in the navigation"
 
     def test_nav_click_navigates(self, qapp):
         home, chat = QWidget(), QWidget()
@@ -73,7 +73,7 @@ class TestSidebarNavigation:
 
     def test_new_conversation_button(self, qapp):
         shell = _make_shell()
-        # Bez asistenta: samo navigira na Chat, ne pada
+        # Without an assistant: just navigates to Chat, does not crash
         shell._on_new_conversation()
         assert shell._pages_widget.currentWidget() is shell._page_map["Chat"]
 
@@ -187,7 +187,7 @@ class TestHomePageRedesign:
             assert card.objectName() == "card"
 
     def test_home_page_no_inline_hex(self, qapp):
-        """HomePage NE sme hardkodirati boje — sve kroz objectName/QSS."""
+        """HomePage must NOT hardcode colors — everything through objectName/QSS."""
         import re
 
         page = self._make_home()
@@ -200,7 +200,7 @@ class TestHomePageRedesign:
     def test_hero_start_conversation_navigates(self, qapp):
         routes: list[str] = []
         page = self._make_home(navigator=lambda r: routes.append(r))
-        # klik na primary dugme unutar hero kartice
+        # click on the primary button inside the hero card
         page._hero.findChildren(object)
         from PySide6.QtWidgets import QPushButton
 

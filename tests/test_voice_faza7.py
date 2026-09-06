@@ -1,6 +1,6 @@
-﻿"""Testovi Faze 7: Wake Word + Automatic Listening (specifikacija §13).
+﻿"""Phase 7 tests: Wake Word + Automatic Listening (specification §13).
 
-Koristi postojeće injekcione šavove: StubSTT (set_transcript), StubTTS,
+Uses the existing injection seams: StubSTT (set_transcript), StubTTS,
 StubWakeWord, create_audio(preferred="stub") i injectable transcription_runner.
 """
 
@@ -25,7 +25,7 @@ from voice.wake_word import StubWakeWord, create_wake_word
 
 
 class FakeAudioManager(StubAudioManager):
-    """Test mikrofon: available=True, buffer raste (za watchdog i sesije)."""
+    """Test microphone: available=True, buffer grows (for watchdog and sessions)."""
 
     def __init__(self):
         super().__init__()
@@ -57,7 +57,7 @@ def _make_manager(qapp, **overrides):
 
     stt = overrides.pop("stt", StubSTT())
     tts = overrides.pop("tts", StubTTS())
-    # wake=None znači "kreiraj iz configa"; eksplicitan stub samo kad test traži
+    # wake=None means "create from config"; an explicit stub only when a test requires it
     wake = overrides.pop("wake", None)
     audio = overrides.pop("audio_manager", FakeAudioManager())
     bus = overrides.pop("event_bus", EventBus())
@@ -104,7 +104,7 @@ def _make_coordinator(qapp, manager, bus, assistant=None):
 
 class TestWakeWord:
     def test_default_wake_word_is_hey_jarvis(self, qapp, tmp_path):
-        """Default wake fraza mora biti 'hey_jarvis' (§1, §17)."""
+        """The default wake phrase must be 'hey_jarvis' (§1, §17)."""
         from core.config_manager import ConfigManager
         from voice.manager import VoiceManager
 
@@ -128,7 +128,7 @@ class TestWakeWord:
         assert wake_cfg.get("provider") == "openwakeword"
 
     def test_custom_wake_word_config(self, qapp, tmp_path):
-        """Custom hotword iz configa se poštuje (mora biti validna labela)."""
+        """A custom hotword from config is respected (must be a valid label)."""
         from core.config_manager import ConfigManager
 
         config = ConfigManager(settings_path=tmp_path / "settings.json")
@@ -138,13 +138,13 @@ class TestWakeWord:
         assert manager._wake.hotword == "alexa"
 
     def test_invalid_hotword_falls_back_to_hey_jarvis(self, tmp_path):
-        """Nepostojeća labela → fallback na 'hey_jarvis' (graceful)."""
+        """A nonexistent label → fallback to 'hey_jarvis' (graceful)."""
         from core.config_manager import ConfigManager
 
         config = ConfigManager(settings_path=tmp_path / "settings.json")
         config.set("voice.wake_word.hotword", "nepostojeca_fraza")
         manager, _ = _make_manager(None, config=config)
-        # Stub prenosi bilo šta; real provider validira. U oba slučaja
+        # The stub passes anything through; the real provider validates. In both cases
         # inicijalizacija ne sme da padne.
         assert manager._wake.hotword in ("nepostojeca_fraza", "hey_jarvis")
 
@@ -163,7 +163,7 @@ class TestWakeWord:
         manager.stop()
 
     def test_duplicate_activation_prevented(self, qapp):
-        """Refractory: drugi trigger unutar cooldown perioda se ignoriše."""
+        """Refractory: a second trigger within the cooldown period is ignored."""
         manager, bus = _make_manager(qapp)
         received: list[str] = []
         bus.subscribe("WAKE_WORD_DETECTED", lambda et, d: received.append(et))
@@ -177,7 +177,7 @@ class TestWakeWord:
         manager.stop()
 
     def test_detector_start_stop_lifecycle(self, qapp):
-        """Start/stop je čist i idempotentan; restart radi."""
+        """Start/stop is clean and idempotent; restart works."""
         manager, _ = _make_manager(qapp)
         manager.start_wake_word()
         manager.stop_wake_word()
@@ -187,10 +187,10 @@ class TestWakeWord:
         assert manager._wake.is_listening is False
 
     def test_provider_fallback_and_hotword(self):
-        """Factory: hotword se poštuje u oba provider-a; fallback je siguran."""
+        """Factory: the hotword is respected in both providers; the fallback is safe."""
         provider = create_wake_word(preferred="openwakeword", hotword="hey_jarvis")
         assert provider.hotword == "hey_jarvis"
-        # Bez obzira na backend (real ili stub), interfеjs je konzistentan
+        # Regardless of the backend (real or stub), the interface is consistent
         assert hasattr(provider, "start") and hasattr(provider, "stop")
 
     def test_stub_fallback_carries_hotword(self):
@@ -205,12 +205,12 @@ class TestWakeWord:
         import importlib.util
 
         if importlib.util.find_spec("openwakeword") is None:
-            pytest.skip("openwakeword nije instaliran")
+            pytest.skip("openwakeword is not installed")
         from voice.wake_word import OpenWakeWord
 
         provider = OpenWakeWord(hotword="hey_jarvis")
         assert provider.hotword == "hey_jarvis"
-        # Inferencija na tišini — score 0, nema trigera
+        # Inference on silence — score 0, no triggers
         import numpy as np
 
         silence = np.zeros(1024, dtype=np.float32)
@@ -218,18 +218,18 @@ class TestWakeWord:
         provider._callback = lambda: triggered.append(True)
         provider._running = True
         provider._detect(silence)
-        assert triggered == []  # tišina ne okida
+        assert triggered == []  # silence does not trigger
 
     def test_real_openwakeword_start_stop(self, qapp):
         """Stvarni provider start/stop lifecycle (sa mikrofonom)."""
         import importlib.util
 
         if importlib.util.find_spec("openwakeword") is None:
-            pytest.skip("openwakeword nije instaliran")
+            pytest.skip("openwakeword is not installed")
         try:
             import sounddevice  # noqa: F401
         except ImportError:
-            pytest.skip("sounddevice/mikrofon nije dostupan")
+            pytest.skip("sounddevice/microphone is not available")
         from voice.wake_word import OpenWakeWord
 
         provider = OpenWakeWord(hotword="hey_jarvis")
@@ -239,7 +239,7 @@ class TestWakeWord:
         assert provider.is_listening is False
 
     def test_wake_word_error_does_not_crash(self, qapp):
-        """Greška u detektoru ne ruši aplikaciju (§12)."""
+        """A detector error does not crash the application (§12)."""
         class ExplodingWake(StubWakeWord):
             def start(self, on_detected):
                 raise RuntimeError("backend exploded")
@@ -262,7 +262,7 @@ class TestAutomaticListening:
         ok = coordinator.set_automatic_listening(True)
         assert ok is True
         assert coordinator.is_automatic_listening is True
-        # Ciklus je počeo — state je RECORDING
+        # The cycle has started — state is RECORDING
         assert manager.state.value == "recording"
         coordinator.shutdown()
 
@@ -306,26 +306,26 @@ class TestAutomaticListening:
         assert manager._auto_watchdog is None
 
     def test_full_cycle_listen_stt_response_tts_relisten(self, qapp):
-        """Pun ciklus: LISTENING → STT → odgovor → TTS → nazad na LISTENING."""
+        """Full cycle: LISTENING → STT → response → TTS → back to LISTENING."""
         manager, bus = _make_manager(qapp)
         stt = manager._stt
-        stt.set_transcript("Koliko je sati?")
+        stt.set_transcript("What time is it?")
 
         assistant = MagicMock()
         assistant.process_message = MagicMock(return_value="Tacno podne.")
-        # MagicMock ima sve atribute — isključi interferenciju sa cancel_event
+        # MagicMock has every attribute — disable interference with cancel_event
         del assistant._cancel_event
 
         coordinator, _chat = _make_coordinator(qapp, manager, bus, assistant=assistant)
         coordinator.set_automatic_listening(True)
         assert manager.state.value == "recording"
 
-        # Korisnik je završio izjavu (watchdog bi ovo radio u realnom vremenu)
+        # The user finished their utterance (the watchdog would do this in real time)
         manager.stop_and_transcribe()
         assert manager.state.value == "processing" or manager.state.value == "idle"
 
         # Transcript stigao → generacija pokrenuta u worker thread-u →
-        # čekamo da završi (worker je QThread; processEvents pumpa signale)
+        # wait for it to finish (worker is a QThread; processEvents pumps signals)
         deadline = 30
         while not assistant.process_message.called and deadline > 0:
             QApplication.processEvents()
@@ -333,9 +333,9 @@ class TestAutomaticListening:
 
             time.sleep(0.05)
             deadline -= 1
-        assert assistant.process_message.called, "Generacija se nije pokrenula"
-        # Koordinator je započeo novi ciklus nakon odgovora; ako je TTS aktivan
-        # (stvarni settings.json postoji), čekamo i kroz TTS fazu do re-listen.
+        assert assistant.process_message.called, "Generation did not start"
+        # The coordinator started a new cycle after the response; if TTS is active
+        # (a real settings.json exists), we also wait through the TTS phase to re-listen.
         deadline = 60
         while manager.state.value != "recording" and deadline > 0:
             QApplication.processEvents()
@@ -345,7 +345,7 @@ class TestAutomaticListening:
             deadline -= 1
         assert coordinator.is_automatic_listening is True
         assert manager.state.value == "recording", (
-            f"Ciklus se nije nastavio — state={manager.state.value}"
+            f"The cycle did not continue — state={manager.state.value}"
         )
         coordinator.shutdown()
 
@@ -370,7 +370,7 @@ class TestAutomaticListening:
 
             def process_message(self, text, **kwargs):
                 self.calls += 1
-                return "odgovor"
+                return "response"
 
         assistant = SlowAssistant()
         coordinator, _ = _make_coordinator(qapp, manager, bus, assistant=assistant)
@@ -385,10 +385,10 @@ class TestAutomaticListening:
     def test_stopping_during_tts_is_safe(self, qapp):
         manager, bus = _make_manager(qapp)
         coordinator, _ = _make_coordinator(qapp, manager, bus)
-        manager.speak("Odgovor asistenta")  # → SPEAKING
+        manager.speak("Assistant response")  # → SPEAKING
         assert manager.state.value == "speaking"
-        coordinator.set_automatic_listening(True)  # tokom SPEAKING — čeka TTS
-        coordinator.set_automatic_listening(False)  # STOP tokom SPEAKING
+        coordinator.set_automatic_listening(True)  # during SPEAKING — waits for TTS
+        coordinator.set_automatic_listening(False)  # STOP during SPEAKING
         assert coordinator.is_automatic_listening is False
         coordinator.shutdown()
 
@@ -402,7 +402,7 @@ class TestAutomaticListening:
         assert manager._auto_watchdog is None
 
     def test_error_disables_auto_mode(self, qapp):
-        """Nepoporljiva greška → mod mora u OFF stanje (§12)."""
+        """Unrecoverable error → the mode must reach a consistent OFF state (§12)."""
         class BrokenAudio(StubAudioManager):
             def start_recording(self):
                 from voice.audio import AudioCaptureError
@@ -423,17 +423,17 @@ class TestAutomaticListening:
 
 class TestInteractionModes:
     def test_wake_word_and_auto_listen_no_competing_sessions(self, qapp):
-        """Wake trigger tokom aktivnog auto ciklusa se ignoriše (§6)."""
+        """A wake trigger during an active auto cycle is ignored (§6)."""
         manager, bus = _make_manager(qapp)
         coordinator, _ = _make_coordinator(qapp, manager, bus)
         coordinator.set_automatic_listening(True)
-        # Auto ciklus aktivan (RECORDING) — wake trigger suvišan:
+        # Auto cycle active (RECORDING) — wake trigger is redundant:
         coordinator._on_wake_word("WAKE_WORD_DETECTED", {})
         assert manager.state.value == "recording"  # i dalje JEDNA sesija
         coordinator.shutdown()
 
     def test_wake_word_triggers_voice_interaction_when_idle(self, qapp):
-        """Wake word u IDLE → pokreće glasovnu sesiju (kao klik na REC)."""
+        """Wake word in IDLE → starts a voice session (like clicking REC)."""
         manager, bus = _make_manager(qapp)
         coordinator, _ = _make_coordinator(qapp, manager, bus)
         assert manager.state.value == "idle"
@@ -453,15 +453,15 @@ class TestInteractionModes:
         coordinator.shutdown()
 
     def test_tts_suppresses_wake_word_echo(self, qapp):
-        """TTS gasi wake word (echo zaštita §8) i vraća ga posle."""
+        """TTS disables the wake word (echo protection §8) and re-enables it afterwards."""
         import time
 
         manager, _bus = _make_manager(qapp)
         manager.start_wake_word()
-        manager.speak("Ovo je odgovor")
-        # Wake word ugašen tokom TTS-a
+        manager.speak("This is the response")
+        # Wake word disabled during TTS
         assert manager._wake_suppressed_for_tts is True
-        # TTS worker je QThread — čekamo finished signal
+        # The TTS worker is a QThread — wait for the finished signal
         deadline = 30
         while manager.state.value == "speaking" and deadline > 0:
             QApplication.processEvents()
@@ -499,7 +499,7 @@ class TestLifecycle:
         manager, bus = _make_manager(qapp)
         coordinator, _ = _make_coordinator(qapp, manager, bus)
         coordinator.set_automatic_listening(True)
-        manager.stop()  # full teardown dok je auto mod aktivan
+        manager.stop()  # full teardown while auto mode is active
         assert manager.state.value == "idle"
         assert manager._auto_watchdog is None
         assert manager._wake.is_listening is False
@@ -562,7 +562,7 @@ class TestAutomaticListeningUI:
 
 class TestConfiguration:
     def test_every_wake_config_consumed_by_runtime(self, qapp, tmp_path):
-        """Svaki config ključ mora imati realan efekat (§10)."""
+        """Every config key must have a real effect (§10)."""
         from core.config_manager import ConfigManager
         from voice.manager import VoiceManager
 

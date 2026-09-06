@@ -84,8 +84,8 @@ class TestModelSystem:
             include_lm_studio=False,
         )
         names = [m.name for m in models]
-        assert any("Qwen2.5-Coder-7B" in n for n in names), f"Qwen2.5-Coder-7B nije pronadjen: {names}"
-        assert any("Phi-4-mini" in n for n in names), f"Phi-4-mini nije pronadjen: {names}"
+        assert any("Qwen2.5-Coder-7B" in n for n in names), f"Qwen2.5-Coder-7B not found: {names}"
+        assert any("Phi-4-mini" in n for n in names), f"Phi-4-mini not found: {names}"
         chat_models = [m for m in models if m.model_type in (ModelType.LLM, ModelType.VISION_LLM)]
         assert len(chat_models) >= 2
 
@@ -150,7 +150,7 @@ class TestModelSystem:
 
         model_path = PROJECT_LLM_DIR / "Qwen2.5-Coder-7B-Q4_K_M.gguf"
         if not model_path.exists():
-            pytest.skip("Model nije kopiran u projekat")
+            pytest.skip("Model was not copied into the project")
         meta = _read_gguf_metadata(model_path)
         assert meta is not None
         assert meta.get("general.architecture") == "qwen2"
@@ -171,8 +171,8 @@ class TestMemorySystem:
         from memory.short_term import ShortTermMemory
 
         stm = ShortTermMemory()
-        stm.add_user("pitanje")
-        stm.add_assistant("odgovor")
+        stm.add_user("question")
+        stm.add_assistant("answer")
         history = stm.get_history()
         assert len(history) == 2
 
@@ -192,15 +192,15 @@ class TestMemorySystem:
         from memory.vector_memory import VectorMemory
 
         vm = VectorMemory(embedding_model=StubEmbeddingModel())
-        vm.add_texts(["asistent radi lokalno", "vremenska prognoza za sutra"])
-        # Stub embedding je deterministicki hash — samo proveravamo da pretraga
+        vm.add_texts(["assistant runs locally", "weather forecast for tomorrow"])
+        # The stub embedding is a deterministic hash — we only verify that the search
         # vrati rezultate sa validnim skorovima (kNN radi bez crash-a).
         hits = vm.search("radi li lokalno?", k=2)
         assert len(hits) == 2
         for entry, score in hits:
             assert isinstance(score, float)
         texts = {getattr(entry, "text", str(entry)) for entry, _ in hits}
-        assert texts == {"asistent radi lokalno", "vremenska prognoza za sutra"}
+        assert texts == {"assistant runs locally", "weather forecast for tomorrow"}
 
 
 # --- knowledge: RAG ----------------------------------------------------------
@@ -210,7 +210,7 @@ class TestKnowledgeSystem:
         from knowledge.document_loader import DocumentLoader
 
         doc = tmp_path / "notes.txt"
-        doc.write_text("Offline AI asistent radi lokalno.", encoding="utf-8")
+        doc.write_text("Offline AI assistant runs locally.", encoding="utf-8")
         loader = DocumentLoader()
         document = loader.load(doc)
         whole_text = str(document)
@@ -219,7 +219,7 @@ class TestKnowledgeSystem:
             content = " ".join(
                 str(getattr(c, "content", c)) for c in getattr(document, "chunks", [])
             )
-        assert "lokalno" in (content or whole_text).lower()
+        assert "locally" in (content or whole_text).lower()
 
     def test_rag_pipeline_index_and_retrieve(self, tmp_path):
         from knowledge.knowledge_base import KnowledgeBase

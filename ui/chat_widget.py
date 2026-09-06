@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -26,6 +28,49 @@ from PySide6.QtWidgets import (
 class MessageRole:
     USER = "user"
     ASSISTANT = "assistant"
+
+
+class _ChatInputEdit(QTextEdit):
+    """Multiline chat input with chat-style Enter handling.
+
+    * ``Enter`` / ``Return`` — emits :attr:`submit_requested` (the widget
+      never inserts a newline for a bare Enter).
+    * ``Shift+Enter`` / ``Shift+Return`` — inserts a newline (default
+      QTextEdit behaviour).
+    * ``Ctrl+Enter`` — also inserts a newline (common alternative users
+      expect when Enter is bound to sending).
+    * ``Ctrl+A/V/C/X/Z/...`` keep their standard editor shortcuts.
+    """
+
+    submit_requested = Signal()
+
+    def keyPressEvent(self, event) -> None:
+        from PySide6.QtCore import Qt
+
+        key = event.key()
+        modifiers = event.modifiers()
+        enter_like = key in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+
+        if enter_like and not (modifiers & (Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.ControlModifier)):
+            # Bare Enter submits — do NOT insert a newline.
+            self.submit_requested.emit()
+            event.accept()
+            return
+        if enter_like:
+            # Shift/Ctrl+Enter: strip the Shift/Ctrl so QTextEdit inserts
+            # a plain newline (default action for Return).
+            from PySide6.QtGui import QKeyEvent
+
+            newline_event = QKeyEvent(
+                event.type(),
+                key,
+                Qt.KeyboardModifier.NoModifier,
+                event.text() or "\n",
+            )
+            super().keyPressEvent(newline_event)
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 def _render_markdown(text: str) -> str:
@@ -109,6 +154,7 @@ class ChatWidget(QWidget):
     search_requested = Signal(str)
     message_deleted = Signal(int)
     automatic_listening_toggled = Signal(bool)
+    send_with_images_requested = Signal(str, list)
 
     def __init__(self) -> None:
         super().__init__()
@@ -188,14 +234,30 @@ class ChatWidget(QWidget):
         self._header_status = QLabel("● Local AI")
         self._header_status.setObjectName("status_local")
 
-        # Capability dugmad po dizajnu (Vision disabled — multimodalna
-        # inferencija nije implementirana, vidi docs/models_report.md)
+        # Online indicator: shown while the assistant is generating through
+        # the opt-in Online API instead of a local model (agent routing).
+        self._online_label = QLabel("🌐 Online")
+        self._online_label.setObjectName("status_local")
+        self._online_label.setToolTip(
+            "This turn is served by an online model via the configured API"
+        )
+        self._online_label.setVisible(False)
+
+        # Capability buttons per the design. Vision is active only when
+        # the current model supports multimodal inference (see
+        # set_vision_available). Files opens the attach dialog.
         self._btn_files = QPushButton("📎 Files")
         self._btn_files.setObjectName("capability_button")
+        self._btn_files.setToolTip("Attach a text file to the message")
+        self._btn_files.clicked.connect(self._on_files_clicked)
         self._btn_vision = QPushButton("🖼 Vision")
         self._btn_vision.setObjectName("capability_button")
         self._btn_vision.setEnabled(False)
-        self._btn_vision.setToolTip("Vision support dolazi u novijoj verziji")
+        self._btn_vision.setToolTip(
+            "Attach an image for analysis (requires a vision-capable model)"
+        )
+        self._btn_vision.clicked.connect(self._on_vision_clicked)
+        self._pending_images: list[str] = []
         self._btn_memory = QPushButton("🧠 Memory")
         self._btn_memory.setObjectName("capability_button")
 
@@ -213,6 +275,7 @@ class ChatWidget(QWidget):
 
         layout.addWidget(self._header_title)
         layout.addWidget(self._header_status)
+        layout.addWidget(self._online_label)
         layout.addSpacing(12)
         layout.addWidget(self._btn_files)
         layout.addWidget(self._btn_vision)
@@ -233,8 +296,12 @@ class ChatWidget(QWidget):
         return layout
 
     def set_assistant_display_name(self, name: str) -> None:
-        """Postavi ime asistenta u chat header (workspace dizajn)."""
+        """Set the assistant name in the chat header (workspace design)."""
         self._header_title.setText(name)
+
+    def set_online_active(self, active: bool) -> None:
+        """Show/hide the 🌐 Online indicator for the current turn."""
+        self._online_label.setVisible(bool(active))
 
     def set_project_context(self, project_name: str, project_id: str | None = None) -> None:
         """Display the active project context in the chat header."""
@@ -302,17 +369,29 @@ class ChatWidget(QWidget):
         self.search_requested.emit(query)
 
     # ------------------------------------------------------------------ #
+    # Multiline input sizing: at least MIN_INPUT_LINES lines are always
+    # visible; the box grows up to MAX_INPUT_LINES and then scrolls.
+    _MIN_INPUT_LINES = 4
+    _MAX_INPUT_LINES = 8
+    _LINE_HEIGHT_PX = 24  # single row height incl. spacing at the app font size
+
     def _build_input_bar(self) -> QHBoxLayout:
         layout = QHBoxLayout()
         layout.setSpacing(8)
 
-        self._input = QTextEdit()
-        self._input.setPlaceholderText("Type a message...")
-        self._input.setFixedHeight(38)
+        self._input = _ChatInputEdit()
+        self._input.setPlaceholderText(
+            "Type a message... (Enter to send, Shift+Enter for a new line)"
+        )
         self._input.textChanged.connect(self._on_text_changed)
         self._input.setAccessibleName("Chat message input")
+        self._input.setTabChangesFocus(True)
+        # Enter submits; Shift+Enter inserts a newline (handled inside
+        # _ChatInputEdit.keyPressEvent — the reliable interception point).
+        self._input.submit_requested.connect(self._submit_input)
         layout.addWidget(self._input, stretch=1)
 
+        self._apply_input_size()
         self._send_btn = QPushButton("➤")
         self._send_btn.setObjectName("send_button")
         self._send_btn.setEnabled(False)
@@ -350,13 +429,13 @@ class ChatWidget(QWidget):
         self._play_btn.setVisible(False)
         layout.addWidget(self._play_btn)
 
-        # Automatic Listening (continuous conversation) — korisnički toggle.
-        # Jasno komunicira stanje: "Automatic Listening" / "Automatic Listening: ON".
+        # Automatic Listening (continuous conversation) — user toggle.
+        # Communicates the state clearly: "Automatic Listening" / "Automatic Listening: ON".
         self._auto_listen_btn = QPushButton("Automatic Listening")
         self._auto_listen_btn.setObjectName("capability_button")
         self._auto_listen_btn.setToolTip(
-            "Continuous conversation: slušaj → transkribuj → odgovori → "
-            "izgovori → slušaj ponovo (bez pritiskanja mikrofona)"
+            "Continuous conversation: listen → transcribe → respond → "
+            "speak → listen again (without pressing the microphone)"
         )
         self._auto_listen_btn.setAccessibleName("Automatic Listening toggle")
         self._auto_listen_btn.setCheckable(True)
@@ -371,7 +450,7 @@ class ChatWidget(QWidget):
         self.automatic_listening_toggled.emit(bool(checked))
 
     def set_automatic_listening_ui(self, enabled: bool) -> None:
-        """Ažurira Automatic Listening dugme da odražava stvarno stanje."""
+        """Updates the Automatic Listening button to reflect the actual state."""
         self._auto_listen_btn.blockSignals(True)
         self._auto_listen_btn.setChecked(enabled)
         if enabled:
@@ -383,12 +462,115 @@ class ChatWidget(QWidget):
     # ------------------------------------------------------------------ #
     def _on_text_changed(self) -> None:
         self._send_btn.setEnabled(bool(self._input.toPlainText().strip()))
+        self._apply_input_size()
+
+    # ------------------------------------------------------------------ #
+    # Dynamic input height (min 4 / max 8 visible lines, then scroll)
+    # ------------------------------------------------------------------ #
+    def _apply_input_size(self) -> None:
+        """Resize the input to fit its content between the min and max.
+
+        The widget always shows at least ``_MIN_INPUT_LINES`` lines.  As the
+        text wraps beyond that, the height grows line by line up to
+        ``_MAX_INPUT_LINES``; further content is reached with the internal
+        scrollbar.
+        """
+        doc = self._input.document()
+        # Account for the document margin around the text block.
+        margins = (
+            doc.documentMargin() * 2
+            + self._input.contentsMargins().top()
+            + self._input.contentsMargins().bottom()
+        )
+        # Height the text actually needs at the current width.
+        needed = int(doc.size().height() + margins)
+        min_h = self._MIN_INPUT_LINES * self._LINE_HEIGHT_PX
+        max_h = self._MAX_INPUT_LINES * self._LINE_HEIGHT_PX
+        self._input.setMinimumHeight(min_h)
+        self._input.setMaximumHeight(max(min_h, min(needed, max_h)))
+        # Keep the caret visible when the content exceeds the box.
+        sb = self._input.verticalScrollBar()
+        if sb.isVisible():
+            sb.setValue(sb.maximum())
+
+    def _submit_input(self) -> None:
+        """Enter/Return handler — send the message (Shift+Enter inserts a newline)."""
+        text = self._input.toPlainText().strip()
+        if text:
+            self._on_send_clicked()
+
+    def _on_files_clicked(self) -> None:
+        """Attach a text file — its contents are appended to the input."""
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Attach Text File",
+            "",
+            "Text Files (*.txt);;Markdown (*.md);;Python (*.py);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except OSError as exc:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Attach File", f"Could not read file:\n{exc}")
+            return
+        header = f"[File: {Path(path).name}]\n"
+        current = self._input.toPlainText()
+        self._input.setPlainText(f"{current}\n{header}{content}".strip())
+        self._on_text_changed()
+
+    def _on_vision_clicked(self) -> None:
+        """Attach images for multimodal analysis (vision models only)."""
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        if not self._btn_vision.isEnabled():
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Attach Images",
+            "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)",
+        )
+        if not paths:
+            return
+        added = 0
+        for p in paths:
+            try:
+                data = Path(p).read_bytes()
+            except OSError:
+                continue
+            if len(data) > 12 * 1024 * 1024:
+                QMessageBox.warning(
+                    self, "Vision", f"Image too large (>12 MB), skipped:\n{p}"
+                )
+                continue
+            self._pending_images.append(base64.b64encode(data).decode("ascii"))
+            added += 1
+        if added:
+            self._btn_vision.setText(f"🖼 Vision ({len(self._pending_images)})")
+
+    def set_vision_available(self, available: bool) -> None:
+        """Enable/disable the Vision button based on the active model."""
+        self._btn_vision.setEnabled(bool(available))
+
+    def _clear_pending_images(self) -> None:
+        self._pending_images.clear()
+        self._btn_vision.setText("🖼 Vision")
 
     def _on_send_clicked(self) -> None:
         text = self._input.toPlainText().strip()
-        if text:
-            self.send_requested.emit(text)
+        if text or self._pending_images:
+            if self._pending_images:
+                self.send_with_images_requested.emit(text, list(self._pending_images))
+            else:
+                self.send_requested.emit(text)
             self._input.clear()
+            self._clear_pending_images()
 
     def _on_voice_clicked(self) -> None:
         self.voice_requested.emit()

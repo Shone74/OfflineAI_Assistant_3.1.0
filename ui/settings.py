@@ -41,7 +41,6 @@ from core.config_manager import ConfigManager
 from core.event_bus import EventBus
 from core.paths import CONFIG_DIR, DATA_DIR, LLM_DIR, LOGS_DIR
 from plugins.manager import PluginManager
-from ui.translations import Language
 
 
 class ProfileTab(QWidget):
@@ -80,7 +79,7 @@ class CommunicationTab(QWidget):
         layout = QFormLayout(self)
 
         self._language_combo = QComboBox()
-        self._language_combo.addItems(["auto", "Serbian", "English", "Spanish", "French"])
+        self._language_combo.addItems(["auto", "English"])
         layout.addRow(QLabel("<b>Language</b>"), self._language_combo)
 
         self._tone_combo = QComboBox()
@@ -132,11 +131,11 @@ class PersonalityTab(QWidget):
         proact_layout = QHBoxLayout()
         proact_layout.addWidget(self._proactivity_slider)
         proact_layout.addWidget(self._proactivity_label)
-        layout.addRow(QLabel("<b>Proaktivnost</b>"), proact_layout)
+        layout.addRow(QLabel("<b>Proactivity</b>"), proact_layout)
 
         self._traits_edit = QLineEdit()
-        self._traits_edit.setPlaceholderText("npr: slobalan, strucan, empaticki")
-        layout.addRow(QLabel("<b>Osobine (odvojene zarezom)</b>"), self._traits_edit)
+        self._traits_edit.setPlaceholderText("e.g. friendly, knowledgeable, empathetic")
+        layout.addRow(QLabel("<b>Traits</b> (comma-separated)"), self._traits_edit)
 
         self._humor_slider.valueChanged.connect(self._on_humor_changed)
         self._proactivity_slider.valueChanged.connect(self._on_proactivity_changed)
@@ -178,8 +177,8 @@ class ExpertiseTab(QWidget):
         layout = QFormLayout(self)
 
         self._areas_edit = QLineEdit()
-        self._areas_edit.setPlaceholderText("npr: programiranje, medicina, finansije")
-        layout.addRow(QLabel("<b>Obsahruto podrska</b> (odvojene zarezom)"), self._areas_edit)
+        self._areas_edit.setPlaceholderText("e.g. programming, medicine, finance")
+        layout.addRow(QLabel("<b>Expertise areas</b> (comma-separated)"), self._areas_edit)
 
     def load_profile(self, profile: dict) -> None:
         expertise = profile.get("expertise", {})
@@ -201,15 +200,15 @@ class BehaviorTab(QWidget):
 
         self._approach_combo = QComboBox()
         self._approach_combo.addItems(["direct", "educational", "collaborative"])
-        layout.addRow(QLabel("<b>Pristup</b>"), self._approach_combo)
+        layout.addRow(QLabel("<b>Approach</b>"), self._approach_combo)
 
         self._uncertainty_combo = QComboBox()
         self._uncertainty_combo.addItems(["ask_clarify", "guess", "hedge"])
-        layout.addRow(QLabel("<b>Rukovanje nesigurnoscima</b>"), self._uncertainty_combo)
+        layout.addRow(QLabel("<b>Uncertainty handling</b>"), self._uncertainty_combo)
 
         self._question_combo = QComboBox()
         self._question_combo.addItems(["open_ended", "closed", "optional"])
-        layout.addRow(QLabel("<b>Vrsta pitanja</b>"), self._question_combo)
+        layout.addRow(QLabel("<b>Question style</b>"), self._question_combo)
 
     def load_profile(self, profile: dict) -> None:
         behavior = profile.get("behavior", {})
@@ -233,9 +232,9 @@ class BoundariesTab(QWidget):
         layout = QFormLayout(self)
 
         self._custom_instructions = QTextEdit()
-        self._custom_instructions.setPlaceholderText("Dodatna ograniczenja ili uputstva...")
+        self._custom_instructions.setPlaceholderText("Additional constraints or instructions...")
         self._custom_instructions.setFixedHeight(100)
-        layout.addRow(QLabel("<b>Dodata uputstva</b>"), self._custom_instructions)
+        layout.addRow(QLabel("<b>Custom instructions</b>"), self._custom_instructions)
 
     def load_profile(self, profile: dict) -> None:
         boundaries = profile.get("boundaries", {})
@@ -248,34 +247,22 @@ class BoundariesTab(QWidget):
 
 
 class LanguageTab(QWidget):
-    """Tab for selecting application language."""
+    """Tab for selecting the application language (English only)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QFormLayout(self)
 
         self._lang_combo = QComboBox()
-        self._lang_combo.addItems(["English", "Serbian"])
+        self._lang_combo.addItems(["English"])
         layout.addRow(QLabel("<b>Language</b>"), self._lang_combo)
 
     def load_settings(self, config: ConfigManager) -> None:
-        lang_code = config.get("app.language", "en")
-        try:
-            lang = Language.from_string(lang_code)
-        except ValueError:
-            lang = Language.ENGLISH
-        
-        index = self._lang_combo.findText(lang.value.title() if lang.value == "en" else 
-                                           ("English" if lang.value == "sr" else "Serbian"))
+        index = self._lang_combo.findText("English")
         if index >= 0:
             self._lang_combo.setCurrentIndex(index)
 
     def get_language(self) -> str:
-        text = self._lang_combo.currentText()
-        if text == "English":
-            return "en"
-        if text == "Serbian":
-            return "sr"
         return "en"
 
 
@@ -1457,20 +1444,20 @@ class VoiceSettingsTab(QWidget):
 
         main_layout.addWidget(tts_group)
 
-        # --- Wake Word section (Faza 7) ---
+        # --- Wake Word section (Phase 7) ---
         wake_group = QGroupBox("Wake Word")
         wake_layout = QFormLayout(wake_group)
 
         self._wake_enabled_chk = QCheckBox("Enable wake-word detection (\"Hey Jarvis\")")
         self._wake_enabled_chk.setToolTip(
-            "Kada je omogućeno, asistent sluša wake frazu i pokreće glasovnu interakciju"
+            "When enabled, the assistant listens for the wake phrase and starts a voice interaction"
         )
         self._wake_enabled_chk.stateChanged.connect(self._on_wake_enabled_changed)
         wake_layout.addRow(self._wake_enabled_chk)
 
         self._wake_hotword_edit = QLineEdit()
         self._wake_hotword_edit.setToolTip(
-            "Wake fraza (openwakeword labela, npr. 'hey_jarvis')"
+            "Wake phrase (openwakeword label, e.g. 'hey_jarvis')"
         )
         self._wake_hotword_edit.editingFinished.connect(self._on_wake_hotword_changed)
         wake_layout.addRow(QLabel("<b>Phrase</b>"), self._wake_hotword_edit)
@@ -1509,12 +1496,26 @@ class VoiceSettingsTab(QWidget):
         stt_cfg = config.get("voice.stt", {})
 
         provider = stt_cfg.get("provider", "faster-whisper")
+        if self._provider_combo.findText(provider) < 0:
+            # Saved provider is unavailable — recommendation: the first offered
+            # (faster-whisper if installed, otherwise stub).
+            provider = self._provider_combo.itemText(0)
         self._provider_combo.setCurrentIndex(max(self._provider_combo.findText(provider), 0))
 
-        model = stt_cfg.get("model", "tiny")
+        # Model: the recommended value is the saved model if it exists locally,
+        # otherwise the first available local model (order = sorted by name).
+        model = stt_cfg.get("model", "")
+        recommended_fallback = False
+        if not model or self._model_combo.findText(model) < 0:
+            first = self._model_combo.itemText(0) if self._model_combo.count() else ""
+            if first and first != "No models found":
+                model = first
+                recommended_fallback = True
         self._select_combo_text(self._model_combo, model)
 
         device = stt_cfg.get("device", "auto")
+        if self._device_combo.findText(device) < 0:
+            device = "auto"
         self._device_combo.setCurrentIndex(max(self._device_combo.findText(device), 0))
 
         language = config.get("voice.language", "auto")
@@ -1528,6 +1529,8 @@ class VoiceSettingsTab(QWidget):
         tts_cfg = config.get("voice.tts", {})
         self._tts_provider_combo.blockSignals(True)
         tts_provider = tts_cfg.get("provider", "pyttsx3")
+        if self._tts_provider_combo.findText(tts_provider) < 0:
+            tts_provider = self._tts_provider_combo.itemText(0)
         self._tts_provider_combo.setCurrentIndex(max(self._tts_provider_combo.findText(tts_provider), 0))
         self._tts_provider_combo.blockSignals(False)
 
@@ -1537,9 +1540,11 @@ class VoiceSettingsTab(QWidget):
         if idx >= 0:
             self._tts_voice_combo.setCurrentIndex(idx)
         elif self._tts_voice_combo.count() > 0:
+            # Recommended value: the first (default) system voice
             self._tts_voice_combo.setCurrentIndex(0)
         self._tts_voice_combo.blockSignals(False)
 
+        # Recommended values: rate 200 wpm, volume 100%
         self._tts_rate_slider.blockSignals(True)
         self._tts_rate_slider.setValue(tts_cfg.get("rate", 200))
         self._tts_rate_slider.blockSignals(False)
@@ -1550,7 +1555,7 @@ class VoiceSettingsTab(QWidget):
         self._tts_volume_slider.blockSignals(False)
         self._tts_volume_value.setText(f"{self._tts_volume_slider.value()}%")
 
-        # Wake word (Faza 7)
+        # Wake word (Phase 7) — recommended phrase: hey_jarvis
         wake_cfg = config.get("voice.wake_word", {})
         self._wake_enabled_chk.blockSignals(True)
         self._wake_enabled_chk.setChecked(bool(wake_cfg.get("enabled", True)))
@@ -1559,7 +1564,24 @@ class VoiceSettingsTab(QWidget):
         self._wake_hotword_edit.setText(str(wake_cfg.get("hotword", "hey_jarvis")))
         self._wake_hotword_edit.blockSignals(False)
 
+        if recommended_fallback:
+            self._persist_recommended_stt(config, provider=provider, model=model)
+
         self._update_status()
+
+    def _persist_recommended_stt(self, config: ConfigManager, provider: str, model: str) -> None:
+        """Persist the recommended STT values so the next STT build uses them."""
+        try:
+            config.set("voice.stt.provider", provider)
+            config.set("voice.stt.model", model)
+            config.set("voice.stt.device", "auto")
+            if self._event_bus is not None:
+                self._event_bus.publish(
+                    "CONFIG_CHANGED",
+                    {"key": "voice.stt.model", "value": model},
+                )
+        except Exception:
+            logger.debug("Persisting recommended STT values failed", exc_info=True)
 
     def save_settings(self, config: ConfigManager) -> None:
         config.set("voice.enabled", self._enabled_chk.isChecked())
@@ -1786,7 +1808,7 @@ class VoiceSettingsTab(QWidget):
                 "CONFIG_CHANGED", {"key": "voice.tts.volume", "value": value / 100.0}
             )
 
-    # --- Wake Word handlers (Faza 7) ---
+    # --- Wake Word handlers (Phase 7) ---
     def _on_wake_enabled_changed(self, state: int) -> None:
         enabled = state == Qt.CheckState.Checked
         self._config.set("voice.wake_word.enabled", enabled)
@@ -1794,7 +1816,7 @@ class VoiceSettingsTab(QWidget):
             self._event_bus.publish(
                 "CONFIG_CHANGED", {"key": "voice.wake_word.enabled", "value": enabled}
             )
-        # Odma primeni na živi VoiceManager
+        # Apply immediately to the live VoiceManager
         if self._voice_manager is not None:
             try:
                 if enabled:
@@ -1811,10 +1833,10 @@ class VoiceSettingsTab(QWidget):
             self._event_bus.publish(
                 "CONFIG_CHANGED", {"key": "voice.wake_word.hotword", "value": hotword}
             )
-        # Napomena: promena fraze zahteva restart VoiceManager-a da bi
-        # provider ponovo kreiran sa novom labelom (dokumentovano ograničenje).
+        # Note: changing the phrase requires a VoiceManager restart so the
+        # provider is recreated with the new label (documented limitation).
         self._status_label.setText(
-            "Wake fraza sačuvana — primenjuje se posle ponovnog pokretanja aplikacije"
+            "Wake phrase saved — it will be applied after the application is restarted"
         )
 
 
@@ -2242,6 +2264,597 @@ class MemorySettingsTab(QWidget):
         self.load_settings(self._config)
 
 
+class APISettingsTab(QWidget):
+    """Tab for the opt-in Online API — multiple providers, one key each.
+
+    The application is offline-first: the API is disabled by default and
+    every key is stored only in ``settings.json`` (under
+    ``api.providers.<id>.api_key``).  Built-in presets cover OpenRouter,
+    Groq, Google AI Studio, Mistral, Cerebras, and Together; custom
+    OpenAI-compatible endpoints can be registered too.
+
+    Agents opt in per model with ``<provider>:<model>`` model names —
+    e.g. ``groq:llama-3.3-70b-versatile`` or ``openrouter:z-ai/glm-5.2:free``.
+    """
+
+    def __init__(
+        self,
+        config: ConfigManager,
+        event_bus: EventBus | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._config = config
+        self._event_bus = event_bus
+        self._current_provider = ""
+        self._catalogue: list[dict] = []
+        self._setup_ui()
+
+    # ------------------------------------------------------------------ #
+    # UI
+    # ------------------------------------------------------------------ #
+    def _setup_ui(self) -> None:
+        from ai.engine.api_engine import PROVIDER_PRESETS
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        notice = QLabel(
+            "Online API is optional and disabled by default. Each provider "
+            "uses its own personal key, stored only in local settings. "
+            "Agents opt in per model with '<provider>:<model>' model names."
+        )
+        notice.setWordWrap(True)
+        notice.setStyleSheet("color: #8C9692; font-size: 11px;")
+        layout.addWidget(notice)
+
+        top_row = QHBoxLayout()
+        self._enabled_chk = QCheckBox("Enable Online API")
+        self._enabled_chk.stateChanged.connect(self._on_enabled_changed)
+        top_row.addWidget(self._enabled_chk)
+        top_row.addStretch()
+        layout.addLayout(top_row)
+
+        # --- Provider selector ---
+        provider_form = QFormLayout()
+        self._provider_combo = QComboBox()
+        for pid, meta in PROVIDER_PRESETS.items():
+            label = meta["label"]
+            self._provider_combo.addItem(f"{label} ({pid})", pid)
+        # Custom providers registered by the user
+        custom = self._config.get("api.custom_providers", {}) or {}
+        for pid, meta in sorted(custom.items()):
+            label = str(meta.get("label", pid))
+            self._provider_combo.addItem(f"{label} ({pid}) — custom", pid)
+        self._provider_combo.currentIndexChanged.connect(self._on_provider_selected)
+        provider_form.addRow(QLabel("<b>Provider</b>"), self._provider_combo)
+        layout.addLayout(provider_form)
+
+        # --- Selected provider form ---
+        form = QFormLayout()
+
+        self._key_link = QLabel("")
+        self._key_link.setStyleSheet("color: #8C9692; font-size: 10px;")
+        self._key_link.setOpenExternalLinks(True)
+        form.addRow(self._key_link)
+
+        self._api_key_edit = QLineEdit()
+        self._api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._api_key_edit.setPlaceholderText("paste your personal key here")
+        self._api_key_edit.setToolTip(
+            "Your personal API key for this provider. Stored only in the "
+            "local settings.json and never logged or committed."
+        )
+        form.addRow(QLabel("<b>API key</b>"), self._api_key_edit)
+
+        self._base_url_edit = QLineEdit()
+        self._base_url_edit.setPlaceholderText("https://... (from the preset)")
+        form.addRow(QLabel("<b>Base URL</b>"), self._base_url_edit)
+
+        self._default_model_edit = QLineEdit()
+        self._default_model_edit.setPlaceholderText("default model id for this provider")
+        form.addRow(QLabel("<b>Default model</b>"), self._default_model_edit)
+
+        self._model_combo = QComboBox()
+        self._model_combo.setEditable(True)
+        self._model_combo.setEditText("")
+        self._model_combo.setToolTip(
+            "Type any model id, or pick one. 'Fetch models' loads the "
+            "provider's live catalogue using your key."
+        )
+        self._model_combo.currentTextChanged.connect(self._on_model_picked)
+        form.addRow(QLabel("<b>Models</b>"), self._model_combo)
+
+        self._timeout_spin = QSpinBox()
+        self._timeout_spin.setRange(10, 600)
+        self._timeout_spin.setSingleStep(10)
+        self._timeout_spin.setSuffix(" s")
+        self._timeout_spin.setToolTip("Per-request timeout (free models can queue)")
+        form.addRow(QLabel("<b>Request timeout</b>"), self._timeout_spin)
+
+        layout.addLayout(form)
+
+        # --- Custom provider row ---
+        custom_row = QHBoxLayout()
+        self._custom_id_edit = QLineEdit()
+        self._custom_id_edit.setPlaceholderText("custom-id (e.g. myllm)")
+        self._custom_url_edit = QLineEdit()
+        self._custom_url_edit.setPlaceholderText("https://my-endpoint/v1")
+        self._btn_add_custom = QPushButton("Add custom provider")
+        self._btn_add_custom.clicked.connect(self._on_add_custom)
+        custom_row.addWidget(self._custom_id_edit)
+        custom_row.addWidget(self._custom_url_edit, stretch=1)
+        custom_row.addWidget(self._btn_add_custom)
+        layout.addLayout(custom_row)
+
+        # --- Buttons ---
+        btn_row = QHBoxLayout()
+        self._btn_fetch = QPushButton("Fetch models")
+        self._btn_fetch.clicked.connect(self._on_fetch_models)
+        btn_row.addWidget(self._btn_fetch)
+        self._btn_test = QPushButton("Test connection")
+        self._btn_test.clicked.connect(self._on_test_clicked)
+        btn_row.addWidget(self._btn_test)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        # --- Fetched-models selection list (appears after Fetch models) ---
+        self._models_group = QGroupBox("Fetched models — select the free ones agents may use")
+        self._models_group.setVisible(False)
+        models_layout = QVBoxLayout(self._models_group)
+
+        sel_row = QHBoxLayout()
+        self._btn_select_free = QPushButton("Select all free")
+        self._btn_select_free.setToolTip(
+            "Check every zero-cost model in the catalogue below."
+        )
+        self._btn_select_free.clicked.connect(self._on_select_all_free)
+        self._btn_clear_selection = QPushButton("Clear selection")
+        self._btn_clear_selection.clicked.connect(self._on_clear_model_selection)
+        sel_row.addWidget(self._btn_select_free)
+        sel_row.addWidget(self._btn_clear_selection)
+        sel_row.addStretch()
+        models_layout.addLayout(sel_row)
+
+        self._btn_auto_free = QCheckBox(
+            "Auto-select free models for agents by task"
+        )
+        self._btn_auto_free.setToolTip(
+            "When enabled, agents without an explicit model are routed to a "
+            "free online model chosen from your selection below — coding "
+            "tasks get coder models, reasoning tasks get thinking models, "
+            "vision tasks get vision models."
+        )
+        self._btn_auto_free.stateChanged.connect(self._on_auto_free_toggled)
+        models_layout.addWidget(self._btn_auto_free)
+
+        self._models_list = QListWidget()
+        self._models_list.setMaximumHeight(220)
+        self._models_list.setToolTip(
+            "Tick the models you want available to agents. Free models "
+            "are marked with [FREE]."
+        )
+        self._models_list.itemChanged.connect(self._on_model_item_changed)
+        models_layout.addWidget(self._models_list)
+        layout.addWidget(self._models_group)
+
+        self._status_label = QLabel("")
+        self._status_label.setStyleSheet("color: #8C9692; font-size: 11px;")
+        self._status_label.setWordWrap(True)
+        layout.addWidget(self._status_label)
+
+        layout.addStretch()
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    def _selected_provider(self) -> str:
+        idx = self._provider_combo.currentIndex()
+        data = self._provider_combo.itemData(idx)
+        return str(data or "openrouter")
+
+    def _preset_for(self, pid: str) -> dict[str, str]:
+        from ai.engine.api_engine import PROVIDER_PRESETS
+
+        if pid in PROVIDER_PRESETS:
+            return PROVIDER_PRESETS[pid]
+        custom = self._config.get("api.custom_providers", {}) or {}
+        meta = custom.get(pid, {})
+        return {
+            "label": str(meta.get("label", pid)),
+            "base_url": str(meta.get("base_url", "")),
+            "key_hint": "",
+            "key_url": "",
+        }
+
+    # ------------------------------------------------------------------ #
+    # Load / save
+    # ------------------------------------------------------------------ #
+    def load_settings(self, config: ConfigManager) -> None:
+        self._config = config
+        self._enabled_chk.blockSignals(True)
+        self._enabled_chk.setChecked(bool(config.get("api.enabled", False)))
+        self._enabled_chk.blockSignals(False)
+        self._load_current_provider()
+
+    def save_settings(self, config: ConfigManager) -> None:
+        self._persist_current_provider()
+        if self._models_list.count() > 0:
+            self._persist_selection()
+        config.set("api.enabled", self._enabled_chk.isChecked())
+        if self._event_bus is not None:
+            self._event_bus.publish(
+                "CONFIG_CHANGED",
+                {"key": "api.enabled", "value": self._enabled_chk.isChecked()},
+            )
+
+    def _load_current_provider(self) -> None:
+        from ai.engine.api_engine import get_provider_config
+
+        pid = self._selected_provider()
+        self._current_provider = pid
+        meta = self._preset_for(pid)
+        if meta.get("key_url"):
+            self._key_link.setText(
+                f'Get a key: <a href="{meta["key_url"]}">{meta["key_url"]}</a>'
+            )
+        else:
+            self._key_link.setText("")
+        self._base_url_edit.setPlaceholderText(meta.get("base_url", "https://..."))
+
+        entry = get_provider_config(self._config, pid) or {}
+        self._api_key_edit.setText(str(entry.get("api_key", "") or ""))
+        self._base_url_edit.setText(str(entry.get("base_url", "") or ""))
+        self._default_model_edit.setText(str(entry.get("model", "") or ""))
+        self._timeout_spin.setValue(int(entry.get("timeout") or 120))
+
+        # Curated suggestions per provider
+        self._model_combo.blockSignals(True)
+        self._model_combo.clear()
+        suggestions = self._curated_models(pid)
+        if suggestions:
+            self._model_combo.addItems(suggestions)
+        self._model_combo.setEditText("")
+        self._model_combo.blockSignals(False)
+
+        key_present = bool(entry.get("api_key"))
+        self._status_label.setText(
+            f"{meta['label']}: key configured ✔" if key_present
+            else f"{meta['label']}: no key yet — paste one above when ready."
+        )
+        self._load_saved_selection(pid)
+
+    def _persist_current_provider(self) -> None:
+        """Persist the form fields under ``self._current_provider``."""
+        from ai.engine.api_engine import set_provider_config
+
+        pid = self._current_provider or self._selected_provider()
+        if not pid:
+            return
+        meta = self._preset_for(pid)
+        set_provider_config(
+            self._config,
+            pid,
+            api_key=self._api_key_edit.text(),
+            base_url=self._base_url_edit.text().strip() or meta.get("base_url", ""),
+            model=self._default_model_edit.text().strip(),
+            timeout=self._timeout_spin.value(),
+        )
+
+    # ------------------------------------------------------------------ #
+    # Handlers
+    # ------------------------------------------------------------------ #
+    def _on_enabled_changed(self, _state: int) -> None:
+        enabled = self._enabled_chk.isChecked()
+        self._config.set("api.enabled", enabled)
+        if self._event_bus is not None:
+            self._event_bus.publish(
+                "CONFIG_CHANGED", {"key": "api.enabled", "value": enabled}
+            )
+        self._status_label.setText(
+            "Online API enabled — agents with '<provider>:<model>' will use it."
+            if enabled else "Online API disabled."
+        )
+
+    def _on_provider_selected(self, _idx: int) -> None:
+        # Save the previously shown provider's form before switching.
+        if self._current_provider and self._current_provider != self._selected_provider():
+            try:
+                self._persist_current_provider()
+                if self._models_list.count() > 0:
+                    self._persist_selection()
+            except Exception:
+                logger.debug("Provider switch persist failed", exc_info=True)
+        self._catalogue = []
+        self._models_list.clear()
+        self._models_group.setVisible(False)
+        self._load_current_provider()
+
+    def _on_model_picked(self, text: str) -> None:
+        if text:
+            self._default_model_edit.setText(text)
+
+    def _on_add_custom(self) -> None:
+        from ai.engine.api_engine import register_custom_provider
+
+        pid = self._custom_id_edit.text().strip().lower()
+        url = self._custom_url_edit.text().strip()
+        if not pid or not url:
+            self._status_label.setText(
+                "Custom provider needs an id and a base URL."
+            )
+            return
+        register_custom_provider(self._config, pid, url)
+        # Add to the combo and select it
+        self._provider_combo.addItem(f"{pid} — custom", pid)
+        idx = self._provider_combo.findData(pid)
+        if idx >= 0:
+            self._provider_combo.setCurrentIndex(idx)
+        self._custom_id_edit.clear()
+        self._custom_url_edit.clear()
+        self._status_label.setText(
+            f"Custom provider '{pid}' added — paste its API key above."
+        )
+
+    def _on_fetch_models(self) -> None:
+        """Live-fetch the provider's model catalogue using the entered key.
+
+        Fills the Models dropdown *and* reveals the checkable list below
+        the button, where the user picks the free models agents may use.
+        """
+        from ai.engine.api_engine import (
+            fetch_provider_model_details,
+            set_provider_config,
+        )
+
+        pid = self._selected_provider()
+        meta = self._preset_for(pid)
+        # Persist the just-typed key first so fetch_provider_config sees it.
+        set_provider_config(
+            self._config, pid,
+            api_key=self._api_key_edit.text(),
+            base_url=self._base_url_edit.text().strip() or meta.get("base_url", ""),
+            model=self._default_model_edit.text().strip(),
+            timeout=self._timeout_spin.value(),
+        )
+        self._status_label.setText("Fetching model catalogue…")
+        QApplication.processEvents()
+        self._catalogue = fetch_provider_model_details(self._config, pid)
+        if self._catalogue:
+            self._model_combo.blockSignals(True)
+            self._model_combo.clear()
+            self._model_combo.addItems([m["id"] for m in self._catalogue])
+            self._model_combo.setEditText("")
+            self._model_combo.blockSignals(False)
+
+            self._models_group.setVisible(True)
+            self._rebuild_models_list()
+            free_count = sum(1 for m in self._catalogue if m["free"])
+            self._status_label.setText(
+                f"{len(self._catalogue)} model(s) fetched "
+                f"({free_count} free) — tick the ones agents may use, or "
+                "'Select all free'."
+            )
+        else:
+            self._status_label.setText(
+                "Could not fetch the catalogue (missing key or network issue) "
+                "— curated suggestions remain available."
+            )
+
+    # ------------------------------------------------------------------ #
+    # Free-model selection list
+    # ------------------------------------------------------------------ #
+    def _full_spec(self, model_id: str) -> str:
+        return f"{self._selected_provider()}:{model_id}"
+
+    def _saved_specs(self, pid: str) -> list[str]:
+        raw = self._config.get("api.selected_free_models", []) or []
+        return [
+            str(s) for s in raw
+            if isinstance(s, str) and s.startswith(f"{pid}:")
+        ]
+
+    def _load_saved_selection(self, pid: str) -> None:
+        """Restore the auto-free checkbox and (if a catalogue exists) ticks."""
+        self._btn_auto_free.blockSignals(True)
+        self._btn_auto_free.setChecked(
+            bool(self._config.get("api.auto_free_models", False))
+        )
+        self._btn_auto_free.blockSignals(False)
+        saved = set(self._saved_specs(pid))
+        if self._catalogue:
+            self._rebuild_models_list(checked=saved)
+
+    def _rebuild_models_list(self, checked: set[str] | None = None) -> None:
+        """(Re)build the checkable fetched-models list."""
+        from PySide6.QtCore import Qt as _Qt
+
+        checked = checked if checked is not None else self._current_specs()
+        self._models_list.blockSignals(True)
+        self._models_list.clear()
+        for m in self._catalogue:
+            spec = self._full_spec(m["id"])
+            label = f"{'[FREE]  ' if m['free'] else ''}{m['id']}"
+            item = QListWidgetItem(label)
+            item.setFlags(item.flags() | _Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                _Qt.CheckState.Checked if spec in checked
+                else _Qt.CheckState.Unchecked
+            )
+            item.setData(_Qt.ItemDataRole.UserRole, spec)
+            self._models_list.addItem(item)
+        self._models_list.blockSignals(False)
+
+    def _current_specs(self) -> set[str]:
+        """The set of checked specs currently in the list."""
+        from PySide6.QtCore import Qt as _Qt
+
+        specs: set[str] = set()
+        for i in range(self._models_list.count()):
+            item = self._models_list.item(i)
+            if (
+                item is not None
+                and item.checkState() == _Qt.CheckState.Checked
+            ):
+                spec = str(item.data(_Qt.ItemDataRole.UserRole) or "")
+                if spec:
+                    specs.add(spec)
+        return specs
+
+    def _persist_selection(self) -> None:
+        """Persist all checked models across providers into the config."""
+        pid = self._current_provider or self._selected_provider()
+        saved = [s for s in self._saved_specs(pid)]
+        new_specs = sorted(self._current_specs())
+        merged = sorted(
+            set(
+                [s for s in saved if s not in new_specs
+                 and s not in self._current_specs()]
+                + [s for s in new_specs]
+            )
+        )
+        # Keep specs for other providers untouched.
+        other = [
+            str(s) for s in (self._config.get("api.selected_free_models", []) or [])
+            if isinstance(s, str) and not s.startswith(f"{pid}:")
+        ]
+        self._config.set("api.selected_free_models", sorted(set(other + merged)))
+        self._publish_config("api.selected_free_models", self._config.get(
+            "api.selected_free_models", []
+        ))
+
+    def _on_select_all_free(self) -> None:
+        """Tick every free model in the fetched catalogue."""
+        from PySide6.QtCore import Qt as _Qt
+
+        if not self._catalogue:
+            return
+        self._models_list.blockSignals(True)
+        for i in range(self._models_list.count()):
+            item = self._models_list.item(i)
+            if item is None:
+                continue
+            mid = str(item.data(_Qt.ItemDataRole.UserRole) or "").split(":", 1)[-1]
+            is_free = next(
+                (m["free"] for m in self._catalogue if m["id"] == mid), False
+            )
+            item.setCheckState(
+                _Qt.CheckState.Checked if is_free else _Qt.CheckState.Unchecked
+            )
+        self._models_list.blockSignals(False)
+        self._persist_selection()
+        free_count = sum(1 for m in self._catalogue if m["free"])
+        self._status_label.setText(
+            f"Selected all {free_count} free model(s) — agents can use them."
+        )
+
+    def _on_clear_model_selection(self) -> None:
+        from PySide6.QtCore import Qt as _Qt
+
+        self._models_list.blockSignals(True)
+        for i in range(self._models_list.count()):
+            item = self._models_list.item(i)
+            if item is not None:
+                item.setCheckState(_Qt.CheckState.Unchecked)
+        self._models_list.blockSignals(False)
+        self._persist_selection()
+        self._status_label.setText("Selection cleared.")
+
+    def _on_auto_free_toggled(self, _state: int) -> None:
+        enabled = self._btn_auto_free.isChecked()
+        self._config.set("api.auto_free_models", enabled)
+        self._publish_config("api.auto_free_models", enabled)
+        self._status_label.setText(
+            "Agents without an explicit model will use a selected free "
+            "online model picked by task type."
+            if enabled else "Auto free-model selection disabled."
+        )
+
+    def _publish_config(self, key: str, value: Any) -> None:
+        if self._event_bus is not None:
+            try:
+                self._event_bus.publish("CONFIG_CHANGED", {"key": key, "value": value})
+            except Exception:
+                logger.debug("CONFIG_CHANGED publish failed", exc_info=True)
+
+    def _on_model_item_changed(self, _item: QListWidgetItem) -> None:
+        """Persist the ticked free models whenever the user (un)checks one."""
+        self._persist_selection()
+
+    def _on_test_clicked(self) -> None:
+        """Send a 1-token test request to verify key + model."""
+        from ai.engine.api_engine import OpenAICompatibleEngine
+
+        self._status_label.setText("Testing…")
+        pid = self._selected_provider()
+        meta = self._preset_for(pid)
+        key = self._api_key_edit.text().strip()
+        url = self._base_url_edit.text().strip() or meta.get("base_url", "")
+        model = (
+            self._default_model_edit.text().strip()
+            or self._model_combo.currentText().strip()
+        )
+        if not key or not model:
+            self._status_label.setText("API key and model are required for the test.")
+            return
+        try:
+            engine = OpenAICompatibleEngine(
+                api_key=key, base_url=url, model=model,
+                timeout=float(self._timeout_spin.value()),
+            )
+            reply = engine.generate_chat(
+                [{"role": "user", "content": "Reply with the single word: ready"}],
+                config=None,
+            )
+            self._status_label.setText(f"Connection OK — model replied: {reply[:60]!r}")
+        except Exception as exc:
+            self._status_label.setText(f"Connection failed: {exc}")
+
+    # ------------------------------------------------------------------ #
+    # Curated suggestions
+    # ------------------------------------------------------------------ #
+    def _curated_models(self, pid: str) -> list[str]:
+        from ai.engine.api_engine import FREE_OPENROUTER_MODELS
+
+        if pid == "openrouter":
+            return list(FREE_OPENROUTER_MODELS)
+        if pid == "groq":
+            return [
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+                "openai/gpt-oss-20b",
+                "openai/gpt-oss-120b",
+                "qwen/qwen3-32b",
+                "moonshotai/kimi-k2-instruct",
+            ]
+        if pid == "google":
+            return [
+                "gemini-2.0-flash",
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite",
+                "gemini-2.5-pro",
+            ]
+        if pid == "mistral":
+            return [
+                "mistral-small-latest",
+                "mistral-large-latest",
+                "open-mistral-nemo",
+            ]
+        if pid == "cerebras":
+            return [
+                "llama-3.3-70b",
+                "llama3.1-8b",
+                "qwen-3-32b",
+            ]
+        if pid == "together":
+            return [
+                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "meta-llama/Llama-3.1-8B-Instruct-Turbo",
+                "Qwen/Qwen2.5-72B-Instruct-Turbo",
+            ]
+        return []
+
+
 class SettingsDialog(QDialog):
     """Modal settings window with model, theme, and profile tabs."""
 
@@ -2258,7 +2871,7 @@ class SettingsDialog(QDialog):
         voice_manager: Any | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Postavke")
+        self.setWindowTitle("Settings")
         self.resize(560, 520)
         self._config = config
         self._event_bus = event_bus
@@ -2281,7 +2894,7 @@ class SettingsDialog(QDialog):
         self._btn_save.setAccessibleName("Save settings")
         self._btn_save.clicked.connect(self._on_save)
         btn_layout.addWidget(self._btn_save)
-        self._btn_close = QPushButton("Zatvori")
+        self._btn_close = QPushButton("Close")
         self._btn_close.setAccessibleName("Close settings")
         self._btn_close.clicked.connect(self.accept)
         btn_layout.addWidget(self._btn_close)
@@ -2312,6 +2925,8 @@ class SettingsDialog(QDialog):
         self._tab_widget.addTab(self._generation_tab, "Generation")
         self._memory_tab = self._create_memory_tab()
         self._tab_widget.addTab(self._memory_tab, "Memory")
+        self._api_tab = self._create_api_tab()
+        self._tab_widget.addTab(self._api_tab, "Online API")
         self._profile_tab = self._create_profile_tab()
         self._tab_widget.addTab(self._profile_tab, "Profile")
 
@@ -2334,6 +2949,9 @@ class SettingsDialog(QDialog):
             event_bus=self._event_bus,
             assistant=self._assistant,
         )
+
+    def _create_api_tab(self) -> APISettingsTab:
+        return APISettingsTab(config=self._config, event_bus=self._event_bus)
 
     def _create_general_tab(self) -> QWidget:
         tab = QWidget()
@@ -2420,6 +3038,9 @@ class SettingsDialog(QDialog):
         if self._memory_tab is not None:
             self._memory_tab.load_settings(self._config)
 
+        if self._api_tab is not None:
+            self._api_tab.load_settings(self._config)
+
         if self._assistant is not None:
             profile = self._assistant.get_assistant_profile()
             self._identity_tab.load_profile(profile)
@@ -2462,6 +3083,9 @@ class SettingsDialog(QDialog):
 
             if self._config is not None and self._memory_tab is not None:
                 self._memory_tab.save_settings(self._config)
+
+            if self._config is not None and self._api_tab is not None:
+                self._api_tab.save_settings(self._config)
 
             if self._config is not None and self._logging_tab is not None:
                 self._logging_tab.save_settings(self._config)

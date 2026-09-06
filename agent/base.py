@@ -168,7 +168,7 @@ class BaseAgent:
         """Execute a single task through the secured tool registry."""
         if task.tool_name is None:
             task.status = TaskStatus.DONE
-            task.result = f"Odgovor: {task.description}"
+            task.result = f"Answer: {task.description}"
             self._publish_fn(
                 "AGENT_TASK_COMPLETED",
                 data={"agent": self._name, "task": task.id, "tool": None},
@@ -177,7 +177,7 @@ class BaseAgent:
 
         if self._tool_registry is None:
             task.status = TaskStatus.BLOCKED
-            task.result = "Nema konfigurisan tool registry"
+            task.result = "No tool registry configured"
             self._publish_fn(
                 "AGENT_TASK_COMPLETED",
                 data={
@@ -223,7 +223,7 @@ class BaseAgent:
                 task.status = TaskStatus.BLOCKED
             else:
                 task.status = TaskStatus.FAILED
-            task.result = result.error or "Nije uspelo"
+            task.result = result.error or "Failed"
             self._publish_fn(
                 "AGENT_TASK_COMPLETED",
                 data={
@@ -297,12 +297,12 @@ class BaseAgent:
         failed = [t for t in self._tasks if t.status == TaskStatus.FAILED]
         blocked = [t for t in self._tasks if t.status == TaskStatus.BLOCKED]
         parts = [
-            f"Agent {self._name}: {len(done)} gotovo, {len(failed)} neuspeh-a, {len(blocked)} blokirano"
+            f"Agent {self._name}: {len(done)} done, {len(failed)} failed, {len(blocked)} blocked"
         ]
         for t in done:
             parts.append(f"  ✓ {t.description}")
         for t in failed:
             parts.append(f"  ✗ {t.description} — {t.result}")
         for t in blocked:
-            parts.append(f"  ⧖ {t.description} — potrebna potvrda")
+            parts.append(f"  ⧖ {t.description} — awaiting confirmation")
         return "\n".join(parts)

@@ -70,7 +70,7 @@ class AssistantHub(QWidget):
 
         status_label = QLabel("100% Local • Offline")
         status_label.setStyleSheet(
-            f"color: {_EMERALD_TEXT}; font-size: 13px; font-weight: 600;"
+            f"color: {_EMERALD_TEXT}; font-size: 15px; font-weight: 600;"
         )
         header.addWidget(status_label)
         layout.addLayout(header)
@@ -128,7 +128,7 @@ class AssistantHub(QWidget):
         title_col = QVBoxLayout()
         title_col.setSpacing(2)
         name = "Offline AI Assistant"
-        desc = "Vaš lokalni AI asistent."
+        desc = "Your local AI assistant."
         traits: list[str] = []
         if self._assistant is not None:
             profile = self._assistant.get_assistant_profile()
@@ -150,7 +150,7 @@ class AssistantHub(QWidget):
         name_label = QLabel(str(name))
         name_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 17px; font-weight: 600;")
         desc_label = QLabel(str(desc))
-        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 12px;")
+        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         desc_label.setWordWrap(True)
         title_col.addWidget(name_label)
         title_col.addWidget(desc_label)
@@ -165,7 +165,7 @@ class AssistantHub(QWidget):
             badge.setStyleSheet(
                 f"background: {_EMERALD_BG_TINT}; color: {_EMERALD_TEXT};"
                 f"border: 1px solid {_EMERALD_BORDER_TINT};"
-                f"border-radius: 10px; padding: 3px 9px; font-size: 10px; font-weight: 600;"
+                f"border-radius: 10px; padding: 3px 9px; font-size: 11px; font-weight: 600;"
             )
             badges.addWidget(badge)
         if not traits:
@@ -173,7 +173,7 @@ class AssistantHub(QWidget):
             badge.setStyleSheet(
                 f"background: {_EMERALD_BG_TINT}; color: {_EMERALD_TEXT};"
                 f"border: 1px solid {_EMERALD_BORDER_TINT};"
-                f"border-radius: 10px; padding: 3px 9px; font-size: 10px; font-weight: 600;"
+                f"border-radius: 10px; padding: 3px 9px; font-size: 11px; font-weight: 600;"
             )
             badges.addWidget(badge)
         title_row.addLayout(badges)
@@ -184,19 +184,19 @@ class AssistantHub(QWidget):
         info_grid.setSpacing(12)
 
         items = [
-            ("Jezik", self._get_profile_field("communication.language", "auto")),
-            ("Tona", self._get_profile_field("communication.tone", "neutral")),
-            ("Stil", self._get_profile_field("communication.response_style", "balanced")),
-            ("Ekspertiza", self._get_expertise()),
+            ("Language", self._get_profile_field("communication.language", "auto")),
+            ("Tone", self._get_profile_field("communication.tone", "neutral")),
+            ("Style", self._get_profile_field("communication.response_style", "balanced")),
+            ("Expertise", self._get_expertise()),
         ]
 
         for label_text, value in items:
             col = QVBoxLayout()
             col.setSpacing(2)
             lbl = QLabel(label_text)
-            lbl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px;")
+            lbl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
             val = QLabel(value)
-            val.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 12px; font-weight: 600;")
+            val.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
             col.addWidget(lbl)
             col.addWidget(val)
             info_grid.addLayout(col)
@@ -246,11 +246,11 @@ class AssistantHub(QWidget):
         left = QVBoxLayout()
         left.setSpacing(4)
         title = QLabel("Active Model")
-        title.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; text-transform: uppercase;")
+        title.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px; text-transform: uppercase;")
         name = QLabel(str(model_name))
         name.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 15px; font-weight: 600;")
         status = QLabel("Ready")
-        status.setStyleSheet(f"color: {_EMERGENCY_HOVER}; font-size: 12px; font-weight: 600;")
+        status.setStyleSheet(f"color: {_EMERGENCY_HOVER}; font-size: 13px; font-weight: 600;")
         left.addWidget(title)
         left.addWidget(name)
         left.addWidget(status)
@@ -262,7 +262,7 @@ class AssistantHub(QWidget):
         if caps:
             cap_text = " · ".join(caps)
             caps_label = QLabel(cap_text)
-            caps_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
+            caps_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px;")
             caps_label.setWordWrap(True)
             layout.addWidget(caps_label)
 
@@ -288,10 +288,10 @@ class AssistantHub(QWidget):
         layout.setSpacing(10)
 
         actions = [
-            ("💬 Novi razgovor", "chat"),
-            ("🧠 Pretraži memoriju", "memory"),
-            ("📚 Pregledaj znanje", "knowledge"),
-            ("📦 Modeli", "models"),
+            ("💬 New conversation", "chat"),
+            ("🧠 Search memory", "memory"),
+            ("📚 Browse knowledge", "knowledge"),
+            ("📦 Models", "models"),
         ]
 
         for label_text, route in actions:
@@ -300,7 +300,7 @@ class AssistantHub(QWidget):
             btn.setStyleSheet(
                 f"background: {_GRAPHITE_DARK_CARD}; color: {_TEXT_SECONDARY};"
                 f"border: 1px solid {_GRAPHITE_BORDER}; border-radius: 7px;"
-                f"padding: 10px 16px; font-size: 12px; text-align: left;"
+                f"padding: 10px 16px; font-size: 13px; text-align: left;"
             )
             btn.setProperty("route", route)
             btn.setFixedHeight(42)

@@ -1,4 +1,4 @@
-"""Project and Workspace managers for FAZA 13.4.
+"""Project and Workspace managers for Phase 13.4.
 
 These managers provide CRUD operations for project and workspace entities,
 with persistence through the existing database layer.

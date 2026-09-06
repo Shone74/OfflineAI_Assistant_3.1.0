@@ -1,7 +1,7 @@
-"""Testovi Faze 4: migracija stranica na design system.
+"""Phase 4 tests: page migration to the design system.
 
-Invariant: stranice u AppShell-u NE koriste hardkodirane hex boje
-(nakon Faze 4 sve dolaze iz ui/design tokena).
+Invariant: AppShell pages do NOT use hardcoded hex colors
+(after Phase 4 everything comes from the ui/design tokens).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 _HEX_RE = re.compile(r"#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b")
 
-# Stranice koje Faza 4 pokriva (module-level konstante moraju biti iz tokena)
+# Pages covered by Phase 4 (module-level constants must come from the tokens)
 PAGE_MODULES = [
     "ui.memory_page",
     "ui.agents_page",
@@ -41,11 +41,11 @@ class TestPagesUseDesignTokens:
 
         for mod in (agents, hub, caps, memory, projects, tools):
             assert mod._EMERALD == WORKSPACE.emerald, (
-                f"{mod.__name__}._EMERALD nije iz WORKSPACE tokena"
+                f"{mod.__name__}._EMERALD is not from the WORKSPACE tokens"
             )
             assert mod._TEXT_PRIMARY == WORKSPACE.text_primary
 
-        # chat widget nema vise inline hex u dugmadima
+        # the chat widget no longer has inline hex in its buttons
         src = Path(chat.__file__).read_text(encoding="utf-8")
         style_blocks = re.findall(r"setStyleSheet\((.*?)\)", src, flags=re.DOTALL)
         for block in style_blocks:
@@ -60,7 +60,7 @@ class TestPagesUseDesignTokens:
         # Workspace dizajn elementi
         assert chat._send_btn.objectName() == "send_button"
         assert chat._btn_vision.objectName() == "capability_button"
-        # Vision je disabled (multimodalna inferencija nije implementirana)
+        # Vision is disabled (multimodal inference is not implemented)
         assert chat._btn_vision.isEnabled() is False
         assert chat._btn_files.objectName() == "capability_button"
         assert chat._btn_memory.objectName() == "capability_button"
@@ -74,12 +74,12 @@ class TestPagesUseDesignTokens:
 
         page = ModelsPage(assistant=None, model_manager=None, event_bus=None)
         page.set_model_status(ModelStatus.LOADING, "test")
-        # boja dolazi iz palete — proveravamo da nije stara hardkodirana
+        # the color comes from the palette — we verify it is not the old hardcoded one
         assert "#D6A24A" not in page._status_label.styleSheet()
         assert "color:" in page._status_label.styleSheet()
 
     def test_pages_importable(self):
-        """Sve AppShell stranice se importuju bez greske (nema kruznih import-a)."""
+        """All AppShell pages import without errors (no circular imports)."""
         import importlib
 
         for module_name in PAGE_MODULES:

@@ -60,6 +60,20 @@ class VoicePage(QWidget):
 
         layout.addWidget(self._tabs)
 
+        # Automatically populate the section with recommended values from the
+        # configuration (provider = faster-whisper / pyttsx3 if available, model =
+        # the first local STT model, device = auto, rate = 200, volume = 100%).
+        # Without this, the page would stay empty until the user opens the
+        # Advanced Settings dialog.
+        try:
+            self._tab_voice.load_settings(self._config)
+        except Exception:
+            pass
+        try:
+            self._tab_audio.load_settings(self._config)
+        except Exception:
+            pass
+
     def get_voice_settings(self) -> VoiceSettingsTab:
         return self._tab_voice
 

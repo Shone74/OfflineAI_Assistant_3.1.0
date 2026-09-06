@@ -1,37 +1,37 @@
 # START HERE — Offline AI Assistant
 
-## Pokretanje
+## Running
 ```
 python run.py
 ```
-(dupli klik na `run.py` takođe radi)
+(double-clicking `run.py` also works)
 
-## Prvo pokretanje
-Kreiraju se folderi u `%LOCALAPPDATA%\OfflineAI\`:
+## First launch
+Folders are created in `%LOCALAPPDATA%\OfflineAI\`:
 - `config\settings.json`
 - `data\assistant.db`
 - `logs\`
 - `models\llm\`
 
-Pa se pokreće instalacioni wizard (7 koraka). Ako nema modela, aplikacija
-radi u limited (stub) modu — dodaj model kroz Models stranicu.
+Then the installation wizard (7 steps) starts. If there is no model, the
+application runs in limited (stub) mode — add a model via the Models page.
 
-## Modeli
-Stavi `.gguf` fajl u jedan od:
+## Models
+Put a `.gguf` file in one of:
 ```
 %LOCALAPPDATA%\OfflineAI\models\llm\       (default)
-models\llm\                                 (folder projekta)
+models\llm\                                 (project folder)
 ```
-Ollama/LM Studio modeli se otkrivaju automatski.
+Ollama/LM Studio models are discovered automatically.
 
-Preporučeno: Qwen2.5-Coder-7B Q4_K_M (~4.4 GB).
+Recommended: Qwen2.5-Coder-7B Q4_K_M (~4.4 GB).
 
-## GPU (opciono)
-Aplikacija sama koristi NVIDIA GPU ako je dostupan CUDA-enabled
-llama-cpp-python (vidi README §GPU ubrzanje).
+## GPU (optional)
+The application automatically uses the NVIDIA GPU if a CUDA-enabled
+llama-cpp-python is available (see README §GPU acceleration).
 
-## Problemi?
-- Logovi: `%LOCALAPPDATA%\OfflineAI\logs\`
-- Testovi: `pytest tests/` (92 testa)
+## Problems?
+- Logs: `%LOCALAPPDATA%\OfflineAI\logs\`
+- Tests: `pytest tests/` (92 tests)
 - Runtime test: `python main_original.py --test-runtime`
-- Dokumentacija: `docs/` folder (plan, status, dizajn, modeli)
+- Documentation: `docs/` folder (plan, status, design, models)

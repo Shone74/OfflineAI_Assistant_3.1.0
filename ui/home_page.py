@@ -1,11 +1,11 @@
-"""Home / status hub page — prema workspace dizajnu.
+"""Home / status hub page — according to the workspace design.
 
-Koristi design komponente (ui/design) — bez hardkodiranih boja.
-Layout po dizajnu:
-- "Your Assistant" naslov + status
-- Assistant hero kartica (✦ ime + status + Start Conversation primary dugme)
-- "Assistant Snapshot" grid 2×2 (Identity, AI Engine, Capabilities, Privacy)
-- "Quick Actions" grid 2×2 (Chat, Memory, Knowledge, Capabilities)
+Uses design components (ui/design) — no hardcoded colors.
+Layout per the design:
+- "Your Assistant" title + status
+- Assistant hero card (✦ name + status + Start Conversation primary button)
+- "Assistant Snapshot" 2×2 grid (Identity, AI Engine, Capabilities, Privacy)
+- "Quick Actions" 2×2 grid (Chat, Memory, Knowledge, Capabilities)
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from ui.theme_manager import ThemeManager
 
 
 class StatusCard(Card):
-    """Status kartica (#card) sa title/value/detail labelima."""
+    """Status card (#card) with title/value/detail labels."""
 
     def __init__(self, title: str, value: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -46,7 +46,7 @@ class StatusCard(Card):
 
 
 class AssistantHeroCard(Card):
-    """Hero kartica asistenta: ✦ ime, opis, status + Start Conversation."""
+    """Assistant hero card: ✦ name, description, status + Start Conversation."""
 
     def __init__(
         self,
@@ -92,7 +92,7 @@ class AssistantHeroCard(Card):
 
 
 class HomePage(QWidget):
-    """Application status hub po workspace dizajnu."""
+    """Application status hub following the workspace design."""
 
     def __init__(
         self,
@@ -126,7 +126,7 @@ class HomePage(QWidget):
         layout.addWidget(title)
         layout.addWidget(subtitle)
 
-        # Hero kartica
+        # Hero card
         self._hero = AssistantHeroCard(
             assistant_name=self._assistant_name,
             on_start_conversation=lambda: self._open("Chat"),
@@ -196,8 +196,21 @@ class HomePage(QWidget):
         try:
             if self._assistant is not None:
                 model_name = getattr(self._assistant, "model_name", None) or "No model loaded"
+                if model_name in ("stub", "No model loaded", "N/A"):
+                    model_name = "No model loaded"
+                    status_hint = getattr(self._assistant, "engine_status", "")
+                    if status_hint in ("runtime_unavailable", "not_configured"):
+                        model_name = "No AI runtime (install llama-cpp-python)"
+                    elif status_hint == "stub_mode":
+                        model_name = "No model loaded (stub mode)"
                 self._ai_card.set_value(model_name)
-                model_ready = model_name != "No model loaded"
+                model_ready = (
+                    model_name not in (
+                        "No model loaded", "No model loaded (stub mode)",
+                        "No AI runtime (install llama-cpp-python)",
+                    )
+                    and getattr(self._assistant, "is_model_ready", False)
+                )
         except Exception:
             pass
 

@@ -285,7 +285,7 @@ class MemoryManager:
         """
         self.clear_semantic_index()
         self._long_term.set_setting(key, value, category)
-        mem_content = f"Korisnik preferira: {key} = {value}"
+        mem_content = f"User prefers: {key} = {value}"
         existing = self._long_term.find_preference_memory(key)
         if existing is None:
             self.save_memory(content=mem_content, mem_type="user_preference")

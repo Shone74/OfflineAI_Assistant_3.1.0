@@ -1,4 +1,4 @@
-"""Testovi design sistema (Faza 2): tokens, QSS builder, komponente, ThemeManager."""
+"""Design system tests (Phase 2): tokens, QSS builder, components, ThemeManager."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ class TestQssBuilder:
             assert selector in qss, f"Nedostaje selektor {selector}"
 
     def test_workspace_qss_no_installer_colors(self):
-        """Workspace QSS ne sme sadrzavati installer hex vrednosti (nema mesanja)."""
+        """Workspace QSS must not contain installer hex values (no mixing)."""
         from ui.design.qss import shell_qss
         from ui.design.tokens import WORKSPACE
 
@@ -150,7 +150,7 @@ class TestThemeManager:
         assert manager.theme == "grey_emerald"
         assert manager.palette.name == "workspace"
 
-        # Zvanični workspace QSS se primenjuje
+        # The official workspace QSS is applied
         applied = qapp.styleSheet()
         assert "#27C48A" in applied
         assert "#nav_button" in applied
@@ -164,16 +164,16 @@ class TestThemeManager:
 
         qapp.setStyleSheet("")
         manager = ThemeManager(qapp)
-        # "dark" je legacy alias za installer režim
+        # "dark" is a legacy alias for the installer palette
         manager.apply("dark")
         assert manager.theme == "dark"
         assert manager.palette.name == "installer"
-        # Uklonjene legacy teme ne rusе aplikaciju — padaju na zvaničnu
+        # Removed legacy themes do not crash — they fall back to the official one
         manager.apply("light")  # type: ignore[arg-type]
         assert manager.theme == "grey_emerald"
 
     def test_current_settings_theme_compatible(self, qapp):
-        """Postojeca postavka ui.theme='dark' iz settings.json mora raditi."""
+        """The existing ui.theme='dark' setting from settings.json must keep working."""
         from ui.theme_manager import ThemeManager
 
         qapp.setStyleSheet("")

@@ -36,10 +36,10 @@ class SystemStatusWidget(QStatusBar):
         self._timer.start(_REFRESH_MS)
 
     def set_model(self, name: str) -> None:
-        if name and name not in ("N/A", "stub", "unavailable"):
+        if name and name not in ("N/A", "stub", "unavailable", "No model loaded"):
             self._model_label.setText(f"Model: {name}")
         else:
-            self._model_label.setText("Model: N/A — Click Settings → Model")
+            self._model_label.setText("Model: N/A — open Models page to load a model")
 
     def set_model_status_text(self, text: str) -> None:
         """Set the model status label text and color."""

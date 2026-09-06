@@ -49,22 +49,22 @@ class KnowledgeSearchTool(Tool):
     """
 
     name = "search_knowledge"
-    description = "Pretraži lokalno indeksirano znanje i vrati relevantne odlomke"
+    description = "Search locally indexed knowledge and return relevant passages"
     category: ToolCategory = ToolCategory.GENERAL
     parameters: ClassVar[list[ParameterSpec]] = [
         ParameterSpec(
             name="query",
-            description="Pretraga upit (šta da potražimo u znanju)",
+            description="Search query (what to look for in the knowledge base)",
         ),
         ParameterSpec(
             name="top_k",
             type="int",
-            description="Maksimalan broj rezultata (1-10, podrazumevano 3)",
+            description="Maximum number of results (1-10, default 3)",
             required=False,
         ),
         ParameterSpec(
             name="project_id",
-            description="ID projekta (buduća podrška — trenutno nije u upotrebi)",
+            description="Project ID (future support — currently unused)",
             required=False,
         ),
     ]
@@ -186,7 +186,7 @@ class KnowledgeSearchTool(Tool):
         )
         return ToolResult(
             success=True,
-            message=f"Pronađeno {len(results)} relevantnog rezultata",
+            message=f"Found {len(results)} relevant results",
             data={
                 "query": query,
                 "results": structured,

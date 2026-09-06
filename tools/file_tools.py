@@ -438,11 +438,11 @@ class FileReaderTool(Tool):
     """Reads the text content of a single file."""
 
     name = "read_file"
-    description = "Proči fajl i vrati sadržaj"
+    description = "Read a file and return its contents"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="path", description="Apsolutna ili relativna putanja"),
-        ParameterSpec(name="max_chars", type="int", description="Maksimalan broj karaktera", required=False),
+        ParameterSpec(name="path", description="Absolute or relative path"),
+        ParameterSpec(name="max_chars", type="int", description="Maximum number of characters", required=False),
     ]
     risk_level = RiskLevel.READ_ONLY
 
@@ -452,7 +452,7 @@ class FileReaderTool(Tool):
     def execute(self, **params: Any) -> ToolResult:
         path = str(params.get("path", ""))
         if not path:
-            return ToolResult(success=False, message="Nije data putanja", error="MissingPath")
+            return ToolResult(success=False, message="No path given", error="MissingPath")
 
         try:
             resolved = validate_read_path(path)
@@ -462,11 +462,11 @@ class FileReaderTool(Tool):
         file_path = resolved.resolved
         if not file_path.exists():
             return ToolResult(
-                success=False, message=f"Fajl ne postoji: {path}", error="NotFound"
+                success=False, message=f"File does not exist: {path}", error="NotFound"
             )
         if not file_path.is_file():
             return ToolResult(
-                success=False, message=f"Putanja nije fajl: {path}", error="NotAFile"
+                success=False, message=f"Path is not a file: {path}", error="NotAFile"
             )
 
         max_chars = int(params.get("max_chars", _DEFAULT_READ_LIMIT) or _DEFAULT_READ_LIMIT)
@@ -476,11 +476,11 @@ class FileReaderTool(Tool):
             return ToolResult(success=False, message=str(exc), error="OSError")
 
         if len(content) > max_chars:
-            content = content[:max_chars] + "\n...[skraćeno]"
+            content = content[:max_chars] + "\n...[truncated]"
 
         logger.debug("Read file %s (%d chars)", file_path, len(content))
         return ToolResult(
-            success=True, message=f"Pročitan fajl: {file_path.name}",
+            success=True, message=f"File read: {file_path.name}",
             data={"path": str(file_path), "content": content, "size": len(content)},
         )
 
@@ -489,12 +489,12 @@ class FileSearcherTool(Tool):
     """Searches a directory tree for files matching a glob pattern."""
 
     name = "search_files"
-    description = "Pretraži fajlove u folderu (npr. *.py)"
+    description = "Search for files in a directory (e.g. *.py)"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="directory", description="Folder za pretragu"),
-        ParameterSpec(name="pattern", description="Glob uzorak (npr. *.py)"),
-        ParameterSpec(name="max_results", type="int", description="Maksimalan broj rezultata", required=False),
+        ParameterSpec(name="directory", description="Directory to search"),
+        ParameterSpec(name="pattern", description="Glob pattern (e.g. *.py)"),
+        ParameterSpec(name="max_results", type="int", description="Maximum number of results", required=False),
     ]
     risk_level = RiskLevel.READ_ONLY
 
@@ -514,7 +514,7 @@ class FileSearcherTool(Tool):
         dir_path = resolved.resolved
         if not dir_path.exists() or not dir_path.is_dir():
             return ToolResult(
-                success=False, message=f"Folder ne postoji: {directory}", error="NotFound"
+                success=False, message=f"Directory does not exist: {directory}", error="NotFound"
             )
 
         try:
@@ -528,7 +528,7 @@ class FileSearcherTool(Tool):
         ]
         logger.debug("Search %s '%s' → %d results", dir_path, pattern, len(result_list))
         return ToolResult(
-            success=True, message=f"Pronađeno {len(result_list)} fajlova",
+            success=True, message=f"Found {len(result_list)} files",
             data={"directory": str(dir_path), "pattern": pattern, "results": result_list},
         )
 
@@ -537,12 +537,12 @@ class ListDirectoryTool(Tool):
     """Lists files and directories in a specified directory."""
 
     name = "list_directory"
-    description = "Izlistaj fajlove i direktorije u folderu"
+    description = "List files and directories in a folder"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="path", description="Direktorijum za prikaz"),
-        ParameterSpec(name="recursive", type="boolean", description="Rekurzivno", required=False),
-        ParameterSpec(name="max_results", type="int", description="Maksimalan broj rezultata", required=False),
+        ParameterSpec(name="path", description="Directory to list"),
+        ParameterSpec(name="recursive", type="boolean", description="Recursive", required=False),
+        ParameterSpec(name="max_results", type="int", description="Maximum number of results", required=False),
     ]
     risk_level = RiskLevel.READ_ONLY
 
@@ -562,11 +562,11 @@ class ListDirectoryTool(Tool):
         dir_path = resolved.resolved
         if not dir_path.exists():
             return ToolResult(
-                success=False, message=f"Direktorijum ne postoji: {path}", error="NotFound"
+                success=False, message=f"Directory does not exist: {path}", error="NotFound"
             )
         if not dir_path.is_dir():
             return ToolResult(
-                success=False, message=f"Putanja nije direktorijum: {path}", error="NotADirectory"
+                success=False, message=f"Path is not a directory: {path}", error="NotADirectory"
             )
 
         try:
@@ -597,7 +597,7 @@ class ListDirectoryTool(Tool):
         logger.debug("Listed %s → %d entries", dir_path, len(entries))
         return ToolResult(
             success=True,
-            message=f"Izlistano {len(entries)} stavki" + (" (recursive)" if recursive else ""),
+            message=f"Listed {len(entries)} entries" + (" (recursive)" if recursive else ""),
             data={"directory": str(dir_path), "entries": entries},
         )
 
@@ -606,10 +606,10 @@ class FileMetadataTool(Tool):
     """Returns metadata for a file or directory."""
 
     name = "file_metadata"
-    description = "Metadata za fajl (veličina, vreme, tip)"
+    description = "Metadata for a file (size, timestamps, type)"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="path", description="Putanja do fajla ili direktorijuma"),
+        ParameterSpec(name="path", description="Path to the file or directory"),
     ]
     risk_level = RiskLevel.READ_ONLY
 
@@ -619,7 +619,7 @@ class FileMetadataTool(Tool):
     def execute(self, **params: Any) -> ToolResult:
         path = str(params.get("path", ""))
         if not path:
-            return ToolResult(success=False, message="Nije data putanja", error="MissingPath")
+            return ToolResult(success=False, message="No path given", error="MissingPath")
 
         try:
             resolved = validate_read_path(path)
@@ -629,7 +629,7 @@ class FileMetadataTool(Tool):
         file_path = resolved.resolved
         if not file_path.exists():
             return ToolResult(
-                success=False, message=f"Fajl ne postoji: {path}", error="NotFound"
+                success=False, message=f"File does not exist: {path}", error="NotFound"
             )
 
         try:
@@ -650,7 +650,7 @@ class FileMetadataTool(Tool):
         }
         logger.debug("File metadata: %s", path)
         return ToolResult(
-            success=True, message=f"Metadata za: {file_path.name}",
+            success=True, message=f"Metadata for: {file_path.name}",
             data=data,
         )
 
@@ -659,11 +659,11 @@ class WriteFileTool(Tool):
     """Creates or overwrites a text file."""
 
     name = "write_file"
-    description = "Napiši ili prepisati tekstualni fajl"
+    description = "Create or overwrite a text file"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="path", description="Putanja do fajla"),
-        ParameterSpec(name="content", description="Sadržaj za pisanje"),
+        ParameterSpec(name="path", description="Path to the file"),
+        ParameterSpec(name="content", description="Content to write"),
         ParameterSpec(name="encoding", description="Encoding (default: utf-8)", required=False),
     ]
     risk_level = RiskLevel.WRITE
@@ -675,7 +675,7 @@ class WriteFileTool(Tool):
         path = str(params.get("path", ""))
         content = params.get("content", "")
         if not path:
-            return ToolResult(success=False, message="Nije data putanja", error="MissingPath")
+            return ToolResult(success=False, message="No path given", error="MissingPath")
         if content is None:
             content = ""
 
@@ -694,7 +694,7 @@ class WriteFileTool(Tool):
             logger.info("Wrote file %s (%d bytes)", file_path, bytes_written)
             return ToolResult(
                 success=True,
-                message=f"Upisano u fajl: {file_path.name}",
+                message=f"Written to file: {file_path.name}",
                 data={"path": str(file_path), "bytes_written": bytes_written},
             )
         except OSError as exc:
@@ -707,10 +707,10 @@ class CreateDirectoryTool(Tool):
     """Creates a directory and any necessary parent directories."""
 
     name = "create_directory"
-    description = "Kreiraj direktorijum"
+    description = "Create a directory"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="path", description="Putanja do direktorijuma"),
+        ParameterSpec(name="path", description="Path to the directory"),
     ]
     risk_level = RiskLevel.WRITE
 
@@ -720,7 +720,7 @@ class CreateDirectoryTool(Tool):
     def execute(self, **params: Any) -> ToolResult:
         path = str(params.get("path", ""))
         if not path:
-            return ToolResult(success=False, message="Nije data putanja", error="MissingPath")
+            return ToolResult(success=False, message="No path given", error="MissingPath")
 
         try:
             resolved = validate_write_path(path, create_parent=True)
@@ -733,7 +733,7 @@ class CreateDirectoryTool(Tool):
             logger.info("Created directory: %s", dir_path)
             return ToolResult(
                 success=True,
-                message=f"Izrađen direktorijum: {dir_path.name}",
+                message=f"Created directory: {dir_path.name}",
                 data={"path": str(dir_path)},
             )
         except OSError as exc:
@@ -744,11 +744,11 @@ class CopyFileTool(Tool):
     """Copies a file from source to destination."""
 
     name = "copy_file"
-    description = "Kopiraj fajl"
+    description = "Copy a file"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="source", description="Izvorna putanja"),
-        ParameterSpec(name="destination", description="Odredišna putanja"),
+        ParameterSpec(name="source", description="Source path"),
+        ParameterSpec(name="destination", description="Destination path"),
     ]
     risk_level = RiskLevel.WRITE
 
@@ -759,9 +759,9 @@ class CopyFileTool(Tool):
         source = str(params.get("source", ""))
         destination = str(params.get("destination", ""))
         if not source:
-            return ToolResult(success=False, message="Nije data izvorna putanja", error="MissingSource")
+            return ToolResult(success=False, message="No source path given", error="MissingSource")
         if not destination:
-            return ToolResult(success=False, message="Nije data odredišna putanja", error="MissingDestination")
+            return ToolResult(success=False, message="No destination path given", error="MissingDestination")
 
         try:
             src_resolved = validate_read_path(source)
@@ -777,11 +777,11 @@ class CopyFileTool(Tool):
 
         if not src_path.exists():
             return ToolResult(
-                success=False, message=f"Izvor fajl ne postoji: {source}", error="NotFound"
+                success=False, message=f"Source file does not exist: {source}", error="NotFound"
             )
         if src_path.is_dir():
             return ToolResult(
-                success=False, message=f"Izvor je direktorijum, ne fajl: {source}", error="NotAFile"
+                success=False, message=f"Source is a directory, not a file: {source}", error="NotAFile"
             )
 
         try:
@@ -789,7 +789,7 @@ class CopyFileTool(Tool):
             logger.info("Copied %s → %s", src_path, dst_path)
             return ToolResult(
                 success=True,
-                message=f"Kopirano u: {dst_path.name}",
+                message=f"Copied to: {dst_path.name}",
                 data={
                     "source": str(src_path),
                     "destination": str(dst_path),
@@ -804,11 +804,11 @@ class MoveFileTool(Tool):
     """Moves or renames a file."""
 
     name = "move_file"
-    description = "Premesti ili preimenuj fajl"
+    description = "Move or rename a file"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="source", description="Izvorna putanja"),
-        ParameterSpec(name="destination", description="Odredišna putanja"),
+        ParameterSpec(name="source", description="Source path"),
+        ParameterSpec(name="destination", description="Destination path"),
     ]
     risk_level = RiskLevel.WRITE
 
@@ -819,9 +819,9 @@ class MoveFileTool(Tool):
         source = str(params.get("source", ""))
         destination = str(params.get("destination", ""))
         if not source:
-            return ToolResult(success=False, message="Nije data izvorna putanja", error="MissingSource")
+            return ToolResult(success=False, message="No source path given", error="MissingSource")
         if not destination:
-            return ToolResult(success=False, message="Nije data odredišna putanja", error="MissingDestination")
+            return ToolResult(success=False, message="No destination path given", error="MissingDestination")
 
         try:
             src_resolved = validate_read_path(source)
@@ -837,7 +837,7 @@ class MoveFileTool(Tool):
 
         if not src_path.exists():
             return ToolResult(
-                success=False, message=f"Izvor fajl ne postoji: {source}", error="NotFound"
+                success=False, message=f"Source file does not exist: {source}", error="NotFound"
             )
 
         try:
@@ -845,7 +845,7 @@ class MoveFileTool(Tool):
             logger.info("Moved %s → %s", src_path, dst_path)
             return ToolResult(
                 success=True,
-                message=f"Premetnuto u: {dst_path.name}",
+                message=f"Moved to: {dst_path.name}",
                 data={"source": str(src_path), "destination": str(dst_path)},
             )
         except OSError as exc:
@@ -856,10 +856,10 @@ class DeleteFileTool(Tool):
     """Deletes a file. Irreversible action."""
 
     name = "delete_file"
-    description = "Obriši fajl (neponovljivo)"
+    description = "Delete a file (irreversible)"
     category: ToolCategory = ToolCategory.FILE
     parameters: ClassVar[list[ParameterSpec]] = [
-        ParameterSpec(name="path", description="Putanja do fajla za brisanje"),
+        ParameterSpec(name="path", description="Path to the file to delete"),
     ]
     risk_level = RiskLevel.DESTRUCTIVE
 
@@ -869,7 +869,7 @@ class DeleteFileTool(Tool):
     def execute(self, **params: Any) -> ToolResult:
         path = str(params.get("path", ""))
         if not path:
-            return ToolResult(success=False, message="Nije data putanja", error="MissingPath")
+            return ToolResult(success=False, message="No path given", error="MissingPath")
 
         try:
             resolved = validate_write_path(path)
@@ -882,13 +882,13 @@ class DeleteFileTool(Tool):
         if file_path.is_dir():
             return ToolResult(
                 success=False,
-                message=f"Putanja je direktorijum, ne fajl: {path}",
+                message=f"Path is a directory, not a file: {path}",
                 error="IsADirectory",
             )
 
         if not file_path.exists():
             return ToolResult(
-                success=False, message=f"Fajl ne postoji: {path}", error="NotFound"
+                success=False, message=f"File does not exist: {path}", error="NotFound"
             )
 
         try:
@@ -896,7 +896,7 @@ class DeleteFileTool(Tool):
             logger.info("Deleted file: %s", file_path)
             return ToolResult(
                 success=True,
-                message=f"Obrisan fajl: {file_path.name}",
+                message=f"Deleted file: {file_path.name}",
                 data={"path": str(file_path), "deleted": True},
             )
         except OSError as exc:

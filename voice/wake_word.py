@@ -67,27 +67,27 @@ class OpenWakeWord(WakeWordProvider):
         from openwakeword import Model
 
         self.hotword = hotword
-        # Windows nema tflite-runtime wheels — koristimo ONNX modele
-        # (podrazumevana preuzimanja uključuju "hey_jarvis").
+        # Windows has no tflite-runtime wheels — use ONNX models
+        # (the default downloads include "hey_jarvis").
         try:
             self._model = Model(inference_framework="onnx")
         except Exception:
-            # Starije verzije / drugi OS — fallback na default init
+            # Older versions / other OS — fall back to default init
             self._model = Model()
-        # Validiraj da model sadrži traženu labelu; ako ne — loguj, ne padaj.
+        # Validate that the model contains the requested label; if not — log, don't crash.
         try:
             labels = list(getattr(self._model, "models", {}).keys())
             if labels and hotword not in labels:
                 logger.warning(
-                    "Hotword %r nije medju modelima %s — koristi se prvi dostupan",
+                    "Hotword %r not among models %s — using the first available one",
                     hotword,
                     labels,
                 )
                 if len(labels) == 1:
                     self.hotword = labels[0]
                 else:
-                    # Postoji "hey_jarvis" medju predefinisanim; ako korisnik
-                    # trazi nepostojecu, vrati se na default.
+                    # "hey_jarvis" exists among the predefined ones; if the user
+                    # requests a non-existent one, fall back to the default.
                     self.hotword = "hey_jarvis" if "hey_jarvis" in labels else labels[0]
         except Exception:
             pass
@@ -179,8 +179,8 @@ def create_wake_word(
 ) -> WakeWordProvider:
     """Return the best available wake-word provider, falling back to StubWakeWord.
 
-    ``hotword`` default je "hey_jarvis" — openwakeword-ova predefinisana
-    "hey jarvis" fraza (specifikacija §1).
+    ``hotword`` default is "hey_jarvis" — openwakeword's predefined
+    "hey jarvis" phrase (specification §1).
     """
     logger.info("Wake-word provider requested: %s (hotword=%s)", preferred, hotword)
     if preferred == "openwakeword":

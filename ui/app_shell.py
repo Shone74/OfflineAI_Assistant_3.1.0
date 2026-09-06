@@ -1,15 +1,15 @@
 """Reference-based application shell for the final standalone build.
 
-Redizajn prema zvaničnom workspace dizajnu (Izgled Aplikaccije/
+Redesign according to the official workspace design (Izgled Aplikaccije/
 assistant_workspace_preview.py + docs/design_system.md):
 
-- Topbar: ☰ (toggle sidebar) · ime asistenta · "● Local" · Context (toggle) · ⚙
-- Sidebar: ime asistenta, "+ New Conversation", navigacija sa selected
-  stanjem, "👤 My Profile" + "⚙ Settings" na dnu
-- Stranice: QStackedWidget
+- Topbar: ☰ (toggle sidebar) · assistant name · "● Local" · Context (toggle) · ⚙
+- Sidebar: assistant name, "+ New Conversation", navigation with selected
+  state, "👤 My Profile" + "⚙ Settings" at the bottom
+- Pages: QStackedWidget
 - Context panel: Assistant / AI Model / Capabilities / Memory + 🔒 footer
 
-Stilovi se NE primenjuju lokalno — dolaze iz ThemeManager-a (ui/design).
+Styles are NOT applied locally — they come from the ThemeManager (ui/design).
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ class AppShell(QMainWindow):
         self.setObjectName("shell")
 
         self._build_ui()
-        # Označi aktivnu stranicu (default route) u navigaciji
+        # Mark the active page (default route) in the navigation
         self._mark_active_nav(self._default_route)
         self._subscribe_events()
 
@@ -92,7 +92,7 @@ class AppShell(QMainWindow):
 
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Stranice prve — _build_sidebar cita self._pages za ADVANCED sekciju
+        # Pages first — _build_sidebar reads self._pages for the ADVANCED section
         self._pages_widget = QStackedWidget()
         for name, page in self._pages:
             self._page_map[name] = page
@@ -124,7 +124,7 @@ class AppShell(QMainWindow):
 
         self._menu_button = QPushButton("☰")
         self._menu_button.setObjectName("topbar_button")
-        self._menu_button.setToolTip("Prikaži/sakrij navigaciju")
+        self._menu_button.setToolTip("Show/hide navigation")
         self._menu_button.clicked.connect(self.toggle_sidebar)
         layout.addWidget(self._menu_button)
 
@@ -140,7 +140,7 @@ class AppShell(QMainWindow):
 
         self._context_button = QPushButton("Context")
         self._context_button.setObjectName("topbar_button")
-        self._context_button.setToolTip("Prikaži/sakrij context panel")
+        self._context_button.setToolTip("Show/hide context panel")
         self._context_button.clicked.connect(self.toggle_context_panel)
         layout.addWidget(self._context_button)
 
@@ -197,7 +197,7 @@ class AppShell(QMainWindow):
             self._nav_buttons[route] = btn
             layout.addWidget(btn)
 
-        # Stranice van primarne navigacije (iz final bootstrap-a):
+        # Pages outside the primary navigation (from final bootstrap):
         # Agents, Tools, Voice, Automation, Workflow, Models → "Advanced"
         advanced_routes = [
             ("Models", "📦"),
@@ -262,7 +262,7 @@ class AppShell(QMainWindow):
 
         # Assistant
         layout.addWidget(section_title("Assistant"))
-        layout.addWidget(value(f"{self._assistant_name}\nBalanced · Serbian"))
+        layout.addWidget(value(f"{self._assistant_name}\nBalanced · English"))
 
         layout.addSpacing(10)
 
@@ -292,7 +292,7 @@ class AppShell(QMainWindow):
 
         layout.addStretch()
 
-        privacy = QLabel("🔒 Local AI\nYour data stays on this device.")
+        privacy = QLabel("🔒 Local AI\nYour data is safe here.")
         privacy.setObjectName("context_privacy")
         privacy.setWordWrap(True)
         layout.addWidget(privacy)
@@ -340,7 +340,7 @@ class AppShell(QMainWindow):
             self._context_memory_label.setText(f"{count} recent messages")
 
     # ------------------------------------------------------------------
-    # Interni helperi
+    # Internal helpers
     # ------------------------------------------------------------------
 
     def _format_model_text(self) -> str:
@@ -349,8 +349,8 @@ class AppShell(QMainWindow):
         return "No model loaded"
 
     def _on_new_conversation(self) -> None:
-        # NEW_CHAT_REQUESTED ide kroz EventBus (ApplicationManager cisti
-        # ShortTermMemory na isti event) — fallback direktan poziv na memoriju.
+        # NEW_CHAT_REQUESTED goes through the EventBus (ApplicationManager clears
+        # ShortTermMemory on the same event) — fallback is a direct call to memory.
         published = False
         if self._event_bus is not None:
             try:
@@ -420,7 +420,7 @@ class AppShell(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._unsubscribe_events()
-        # Faza 7: zaustavi Automatic Listening + aktivnu generaciju
+        # Phase 7: stop Automatic Listening + active generation
         coordinator = getattr(self, "_chat_coordinator", None)
         if coordinator is not None:
             try:

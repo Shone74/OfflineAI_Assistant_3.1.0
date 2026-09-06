@@ -1,4 +1,4 @@
-"""Installer System — FAZA 12 (v1.2.0).
+"""Installer System — Phase 12 (v1.2.0).
 
 Public API:
     detect_hardware       — detect CPU / RAM / GPU / Storage

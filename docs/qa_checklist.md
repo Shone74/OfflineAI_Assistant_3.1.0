@@ -1,62 +1,62 @@
-# QA Checklist — Verifikacija bez regresije
+# QA Checklist — Verification without regression
 
-**Namena:** Definiše šta znači "funkcionalnost ostaje ispravna kroz celu aplikaciju". Svaki korak iz plana mora proći relevantne stavke pre nego što se obeleži kao ✅ u current_status.md.
+**Purpose:** Defines what "functionality remains intact across the entire application" means. Every step from the plan must pass the relevant items before being marked ✅ in current_status.md.
 
 ---
 
-## 1. Regression smoke suite (obavezno posle SVAKOG koraka)
+## 1. Regression smoke suite (mandatory after EVERY step)
 
 ```powershell
 $env:QT_QPA_PLATFORM="offscreen"; $env:OFFLINE_AI_TEST_MODE="1"
 & "C:\Users\Bota\AppData\Local\Programs\Python\Python311\python.exe" -m pytest tests/ -v
 ```
-- Nula palih testova (baseline iz faze 0.3 + novi testovi)
-- Nema novih warning-a u logu vs baseline
+- Zero failing tests (the phase 0.3 baseline + new tests)
+- No new warnings in the log vs the baseline
 
-## 2. Launch provera (posle UI koraka)
+## 2. Launch check (after UI steps)
 
 ```powershell
 & "C:\Users\Bota\AppData\Local\Programs\Python\Python311\python.exe" run.py
 ```
-- App se pokreće BEZ traceback-a u konzoli i bez crash-a
-- Vidljiv je samo jedan glavni prozor (AppShell) — bez treperenja starog MainWindow-a
-- Logovi u `%LOCALAPPDATA%\OfflineAI\logs\` bez ERROR unosa novog nastanka
+- The app starts WITHOUT a traceback in the console and without a crash
+- Only one main window (AppShell) is visible — no flickering of the old MainWindow
+- Logs in `%LOCALAPPDATA%\OfflineAI\logs\` contain no newly occurring ERROR entries
 
-## 3. Funkcionalna matrica (E2E — faza 8.4, ali ključne stavke i tokom faza)
+## 3. Functional matrix (E2E — phase 8.4, but key items also during phases)
 
-| # | Funkcija | Kako se verifikuje | Faze koje je diraju |
+| # | Function | How it is verified | Phases that touch it |
 |---|---|---|---|
-| F1 | Chat streaming sa stvarnim modelom | Poruka → tokeni se pojavljuju; odgovor kompletan | 1, 3, 4.2, 6.1 |
-| F2 | GPU offload | `nvidia-smi` pokazuje VRAM tokom generacije | 6.1 |
-| F3 | Model discovery (models/llm + E:/models ako u putanjama) | Models stranica lista oba kopirana modela | 4.5, 6.1 |
-| F4 | Aktivacija/drugi model | Switch na Phi-4-mini i nazad radi | 4.5, 6.2 |
-| F5 | Memorija: add/forget | Add Memory → restart → memory opstaje | 4.3 |
-| F6 | "remember..." okidač u chatu | Eksplicitna naredba pamćenja se potvrđuje | 4.2, 4.3 |
-| F7 | Knowledge indeksiranje + pretraga | Dodaj .md/.txt izvor → upit preko KnowledgeSearchTool-a | 4.4 |
-| F8 | Tool pozivi (tool_calling) | Agent izvršava sistem tool sa permission promptom | 4.2, 4.8 |
-| F9 | Permission sloj (ASK) | Rizican tool zahteva potvrdu | 4.8 |
-| F10 | Projects create/open | Novi projekat → settings override radi | 4.7 |
-| F11 | Automation workflow | Pokrenuti ugrađeni system_check workflow | 4.8 |
-| F12 | Voice STT/TTS test dugmad | Reprodukcija + snimak | 4.8b |
-| F13 | Settings perzistencija | Promena teme/modela → restart → opstaje | 3.5, 4.9 |
-| F14 | System tray | Minimizacija u tray + restore | 4.10 |
-| F15 | Wizard prvi-run | (rename settings first_run.completed=false) → wizard teče svih 7 koraka | 5.x |
-| F16 | Wizard: prava instalacija | Koraci rade stvarne akcije (folderi, provere) | 5.3 |
-| F17 | Navigacija svih stranica | Svaka ruta iz sidebara otvara stranicu bez greške | 3.2, 4.x |
-| F18 | Context panel podaci | Model/memorija/capabilities odražavaju stvarno stanje | 3.3, 3.4 |
-| F19 | Topbar toggle | ☰ i Context dugmad skrivaju/prikazuju panele | 3.1 |
-| F20 | Restart perzistencija | Ceo ciklus → restart → sve postavke/konverzacije tu | 8.4 |
+| F1 | Chat streaming with the real model | Message → tokens appear; response complete | 1, 3, 4.2, 6.1 |
+| F2 | GPU offload | `nvidia-smi` shows VRAM during generation | 6.1 |
+| F3 | Model discovery (models/llm + E:/models if in paths) | Models page lists both copied models | 4.5, 6.1 |
+| F4 | Activation/second model | Switching to Phi-4-mini and back works | 4.5, 6.2 |
+| F5 | Memory: add/forget | Add Memory → restart → memory persists | 4.3 |
+| F6 | "remember..." trigger in chat | Explicit memorization command is confirmed | 4.2, 4.3 |
+| F7 | Knowledge indexing + search | Add a .md/.txt source → query via the KnowledgeSearchTool | 4.4 |
+| F8 | Tool calls (tool_calling) | The agent executes a system tool with a permission prompt | 4.2, 4.8 |
+| F9 | Permission layer (ASK) | A risky tool requires confirmation | 4.8 |
+| F10 | Projects create/open | New project → settings override works | 4.7 |
+| F11 | Automation workflow | Run the built-in system_check workflow | 4.8 |
+| F12 | Voice STT/TTS test buttons | Playback + recording | 4.8b |
+| F13 | Settings persistence | Theme/model change → restart → persists | 3.5, 4.9 |
+| F14 | System tray | Minimize to tray + restore | 4.10 |
+| F15 | Wizard first-run | (rename settings first_run.completed=false) → wizard flows through all 7 steps | 5.x |
+| F16 | Wizard: real installation | Steps perform real actions (folders, checks) | 5.3 |
+| F17 | Navigation to all pages | Every route from the sidebar opens the page without an error | 3.2, 4.x |
+| F18 | Context panel data | Model/memory/capabilities reflect the actual state | 3.3, 3.4 |
+| F19 | Topbar toggle | ☰ and Context buttons hide/show the panels | 3.1 |
+| F20 | Restart persistence | Full cycle → restart → all settings/conversations present | 8.4 |
 
-## 4. Vizuelne provere (posle design koraka)
+## 4. Visual checks (after design steps)
 
-- Poređenje sa `Izgled Aplikaccije/` preview-ima (side-by-side)
-- Palete: wizard ekran koristi installer paletu, app koristi workspace paletu — nema mešanja
-- Nema hardkodiranih hex vrednosti van `ui/design/tokens.py` (grep provera u 2.1)
-- Fontovi Segoe UI, veličine po design_system.md §4
+- Comparison with the `Izgled Aplikaccije/` previews (side-by-side)
+- Palettes: the wizard screen uses the installer palette, the app uses the workspace palette — no mixing
+- No hardcoded hex values outside `ui/design/tokens.py` (grep check in 2.1)
+- Segoe UI fonts, sizes per design_system.md §4
 
-## 5. Zabrane (anti-regresija pravila)
+## 5. Prohibitions (anti-regression rules)
 
-- NE brisati nijednu stranicu/funkcionalnu rutu iz MainWindow dok se ne preusmeri u AppShell
-- NE menjati potpise javnih API-ja core/ai/ dok ne prođe smoke suite
-- NE dirati `%LOCALAPPDATA%\OfflineAI\` ručno tokom testova (osim renames za wizard test)
-- Svaki korak = commit (vidljiv diff; lakši rollback)
+- DO NOT delete any page/functional route from MainWindow until it is redirected into AppShell
+- DO NOT change signatures of public core/ai/ APIs until the smoke suite passes
+- DO NOT touch `%LOCALAPPDATA%\OfflineAI\` manually during tests (except renames for the wizard test)
+- Every step = commit (visible diff; easier rollback)

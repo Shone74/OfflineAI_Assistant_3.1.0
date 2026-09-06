@@ -236,20 +236,20 @@ class WelcomePage(QWizardPage):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setTitle("Dobrodošli u Offline AI Assistant")
+        self.setTitle("Welcome to Offline AI Assistant")
         layout = QVBoxLayout(self)
 
         info = QLabel(
-            "<b>Vaš lokalni AI asistent — 100% offline.</b><br><br>"
-            "• Vaši podaci i konverzacije ostaju na vašem računaru<br>"
-            "• Nema obavezog internetskog saobraćaja<br>"
-            "• AI model radi direktno na vašem uređaju<br>"
-            "• Sve konfiguracije se čuvaju lokalno<br><br>"
-            "Ovaj čarobnjak će vam pomoći da:<br>"
-            "1. Detektujemo vaš hardver<br>"
-            "2. Preporučimo odgovarajući AI model<br>"
-            "3. Preuzmemo i aktiviramo ga<br><br>"
-            "Kliknite <b>Dalje</b> za početak."
+            "<b>Your local AI assistant — 100% offline.</b><br><br>"
+            "• Your data and conversations stay on your computer<br>"
+            "• No mandatory internet traffic<br>"
+            "• The AI model runs directly on your device<br>"
+            "• All configurations are stored locally<br><br>"
+            "This wizard will help you:<br>"
+            "1. Detect your hardware<br>"
+            "2. Recommend a suitable AI model<br>"
+            "3. Download and activate it<br><br>"
+            "Click <b>Next</b> to begin."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -264,10 +264,10 @@ class WelcomePage(QWizardPage):
         privacy_layout = QHBoxLayout(self._privacy_card)
         privacy_icon = QLabel("🔒")
         privacy_text = QLabel(
-            "<b>Vaša privatnost je zaštićena.</b><br>"
-            "Offline AI Assistant radi lokalno na vašem računaru. "
-            "Vaše konverzacije i lični podaci ostaju na vašem uređaju "
-            "i ne šalju se na eksterne servise ili oblak."
+            "<b>Your privacy is protected.</b><br>"
+            "Offline AI Assistant runs locally on your computer. "
+            "Your conversations and personal data stay on your device "
+            "and are not sent to external services or the cloud."
         )
         privacy_text.setWordWrap(True)
         privacy_layout.addWidget(privacy_icon)
@@ -277,10 +277,10 @@ class WelcomePage(QWizardPage):
         features = QFrame()
         features_layout = QHBoxLayout(features)
         feature_labels = [
-            ("Lokalno AI obrada", "AI obrada se dešava direktno na vašem računaru."),
-            ("Privatnost pod kontrolom", "Vaši podaci ostaju pod vašom kontrolom."),
-            ("Pametna preporuka", "Instalator analizira vaš sistem."),
-            ("Model preporuke", "Preporučićemo modele pogodne za vaš hardver."),
+            ("Local AI processing", "AI processing happens directly on your computer."),
+            ("Privacy under control", "Your data stays under your control."),
+            ("Smart recommendation", "The installer analyzes your system."),
+            ("Model recommendation", "We'll recommend models suitable for your hardware."),
         ]
         for title, desc in feature_labels:
             card = QFrame()
@@ -296,7 +296,7 @@ class WelcomePage(QWizardPage):
             title_label = QLabel(f"<b>{title}</b>")
             title_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 11px; font-weight: 600;")
             desc_label = QLabel(desc)
-            desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px; line-height: 1.5;")
+            desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; line-height: 1.5;")
             desc_label.setWordWrap(True)
             card_layout.addWidget(title_label)
             card_layout.addWidget(desc_label)
@@ -310,12 +310,12 @@ class HardwareScanPage(QWizardPage):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setTitle("Analiza hardvera")
+        self.setTitle("Hardware Analysis")
         self._profile: HardwareProfile | None = None
         self._recommendation: ModelRecommendation | None = None
         self._layout = QVBoxLayout(self)
 
-        self._status_label = QLabel("Skeniram hardver...")
+        self._status_label = QLabel("Scanning hardware...")
         self._status_label.setWordWrap(True)
         self._status_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         self._layout.addWidget(self._status_label)
@@ -325,7 +325,7 @@ class HardwareScanPage(QWizardPage):
         self._info_box: QFrame | None = None
 
     def initializePage(self) -> None:
-        self._status_label.setText("Skeniram hardver...")
+        self._status_label.setText("Scanning hardware...")
         self._clear_dynamic_widgets()
         self._scan_hardware()
 
@@ -350,8 +350,8 @@ class HardwareScanPage(QWizardPage):
         except Exception as exc:
             logger.error("Hardware scan failed: %s", exc)
             self._status_label.setText(
-                f"<b>Greška pri skeniranju hardvera:</b><br>{exc}<br><br>"
-                "Možete pokušati kasnije."
+                f"<b>Error scanning hardware:</b><br>{exc}<br><br>"
+                "You can try again later."
             )
 
     def _on_scan_complete(self, profile: HardwareProfile, rec: ModelRecommendation) -> None:
@@ -378,11 +378,11 @@ class HardwareScanPage(QWizardPage):
         cpu_cores = getattr(profile, "cpu_cores", "N/A")
         vram = f"{vram_gb:.0f} GB" if vram_gb else "N/A"
         return (
-            f"<b>Hardver detektovan:</b><br><br>"
-            f"CPU: {cpu_name} ({cpu_cores} jezra)<br>"
+            f"<b>Hardware detected:</b><br><br>"
+            f"CPU: {cpu_name} ({cpu_cores} cores)<br>"
             f"RAM: {ram_total:.0f} GB<br>"
             f"GPU: {gpu_name} ({vram} VRAM)<br><br>"
-            f"<b>Preporuka:</b> {getattr(rec, 'label', 'N/A')} model<br>"
+            f"<b>Recommendation:</b> {getattr(rec, 'label', 'N/A')} model<br>"
             f"{getattr(rec, 'reason', '')}"
         )
 
@@ -405,10 +405,10 @@ class HardwareScanPage(QWizardPage):
         )
         text_layout = QVBoxLayout()
         text_layout.setContentsMargins(8, 0, 0, 0)
-        title = QLabel("Sistem kompatibilan")
+        title = QLabel("System compatible")
         title.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 11px; font-weight: 600;")
-        desc = QLabel("Vaš računar zadovoljava minimalne zahteve.")
-        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px; margin-top: 2px;")
+        desc = QLabel("Your computer meets the minimum requirements.")
+        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; margin-top: 2px;")
         text_layout.addWidget(title)
         text_layout.addWidget(desc)
         layout.addWidget(icon)
@@ -470,11 +470,11 @@ class HardwareScanPage(QWizardPage):
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
         name_label = QLabel(name)
-        name_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        name_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         value_label = QLabel(value)
         value_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 10px; font-weight: 600;")
         status_label = QLabel(label.upper())
-        status_label.setStyleSheet(f"color: {label_color}; font-size: 8px; font-weight: 600;")
+        status_label.setStyleSheet(f"color: {label_color}; font-size: 10px; font-weight: 600;")
         info_layout.addWidget(name_label)
         info_layout.addWidget(value_label)
         info_layout.addWidget(status_label)
@@ -498,13 +498,13 @@ class HardwareScanPage(QWizardPage):
         )
         layout = QVBoxLayout(info)
         layout.setContentsMargins(10, 10, 10, 10)
-        title = QLabel("⚠ Vaša preporuka modela")
-        title.setStyleSheet(f"color: {_WARNING_AMBER}; font-size: 9px; text-transform: uppercase;")
+        title = QLabel("⚠ Your model recommendation")
+        title.setStyleSheet(f"color: {_WARNING_AMBER}; font-size: 11px; text-transform: uppercase;")
         desc = QLabel(
-            f"Preporučeni model je {rec.label} ({rec.reason}). "
-            "Možete izabrati drugi model na sledećem koraku."
+            f"The recommended model is {rec.label} ({rec.reason}). "
+            "You can choose a different model in the next step."
         )
-        desc.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px; line-height: 1.5;")
+        desc.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px; line-height: 1.5;")
         desc.setWordWrap(True)
         layout.addWidget(title)
         layout.addWidget(desc)
@@ -516,7 +516,7 @@ class ModelSelectionPage(QWizardPage):
 
     def __init__(self, model_manager: ModelManager, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setTitle("Izaberite AI model")
+        self.setTitle("Choose an AI model")
         self._manager = model_manager
         self._selected_model = ""
         self._model_options: QListWidget = QListWidget()
@@ -554,8 +554,8 @@ class ModelSelectionPage(QWizardPage):
             if profile is not None:
                 hw_line = f"CPU: {profile.cpu_name} · RAM: {profile.ram_total_gb:.0f} GB"
             self._header.setText(
-                f"Na osnovu vaše konfiguracije, preporučujemo {rec.label} model. "
-                f"Ova preporuka nudi dobro ravnotežje kvaliteta, brzine i korišćenja resursa."
+                f"Based on your configuration, we recommend the {rec.label} model. "
+                f"This recommendation offers a good balance of quality, speed, and resource usage."
                 + (f"<br>{hw_line}" if hw_line else "")
             )
 
@@ -568,11 +568,11 @@ class ModelSelectionPage(QWizardPage):
         model_items = [
             (
                 "Qwen 2.5 7B — Q4_K_M",
-                f"Preporučeno · ~{size_gb:.1f} GB · GPU akceleracija dostupna",
+                f"Recommended · ~{size_gb:.1f} GB · GPU acceleration available",
             ),
-            ("Small / Fast Model", "Manji model, brži odziv · ~1.5 GB"),
-            ("Large Quality Model", "Veći model, bolja kvalitet · ~8 GB"),
-            ("User Defined", "Prikaži sve modele na vašem sistemu"),
+            ("Small / Fast Model", "Smaller model, faster response · ~1.5 GB"),
+            ("Large Quality Model", "Larger model, better quality · ~8 GB"),
+            ("User Defined", "Show all models on your system"),
         ]
         for name, desc in model_items:
             item = QListWidgetItem(name)
@@ -590,7 +590,7 @@ class ModelSelectionPage(QWizardPage):
 
         self._model_details.setStyleSheet(
             f"background: {_GRAPHITE_DARK_CARD}; color: {_TEXT_SECONDARY}; "
-            f"border: 1px solid {_GRAPHITE_BORDER}; border-radius: 5px; font-size: 9px;"
+            f"border: 1px solid {_GRAPHITE_BORDER}; border-radius: 5px; font-size: 11px;"
         )
 
     def _on_model_selected(self, item: QListWidgetItem) -> None:
@@ -606,14 +606,14 @@ class LocationsPage(QWizardPage):
 
     def __init__(self, model_manager: ModelManager, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setTitle("Lokacije instalacije")
+        self.setTitle("Installation Locations")
         self._manager = model_manager
         layout = QVBoxLayout(self)
 
         header = QLabel(
-            "Možete instalirati aplikaciju i AI modele na različite lokacije. "
-            "Ovo omogućava da aplikaciju smestite na sistemski disk, "
-            "dok veoma velike AI modele čuvate na drugom disku."
+            "You can install the application and AI models in different locations. "
+            "This allows you to place the application on the system disk "
+            "while keeping very large AI models on another disk."
         )
         header.setWordWrap(True)
         header.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px; line-height: 1.5;")
@@ -624,16 +624,16 @@ class LocationsPage(QWizardPage):
         self._app_path_edit.setFixedHeight(30)
         self._models_path_edit.setFixedHeight(30)
 
-        self._app_browse = QPushButton("Pretraži")
-        self._models_browse = QPushButton("Pretraži")
+        self._app_browse = QPushButton("Browse")
+        self._models_browse = QPushButton("Browse")
         self._app_browse.clicked.connect(self._on_browse_app)
         self._models_browse.clicked.connect(self._on_browse_models)
 
         self._app_card = self._build_location_card(
-            "APP", "Instalacija aplikacije", self._app_path_edit, self._app_browse
+            "APP", "Application installation", self._app_path_edit, self._app_browse
         )
         self._models_card = self._build_location_card(
-            "AI", "Lokacija AI modela", self._models_path_edit, self._models_browse
+            "AI", "AI model location", self._models_path_edit, self._models_browse
         )
         layout.addWidget(self._app_card)
         layout.addWidget(self._models_card)
@@ -688,13 +688,13 @@ class LocationsPage(QWizardPage):
         layout.addLayout(header)
 
         desc_label = QLabel(
-            "Lokacija gde će aplikacija/model biti instaliran."
+            "The location where the application/model will be installed."
             if icon == "APP"
-            else "AI model fajlovi mogu zauzimati nekoliko gigabajta. "
-            "Možete ih smestiti na drugi disk sa više slobodnog prostora."
+            else "AI model files can take up several gigabytes. "
+            "You can place them on another disk with more free space."
         )
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px; line-height: 1.4;")
+        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; line-height: 1.4;")
         layout.addWidget(desc_label)
 
         path_row = QHBoxLayout()
@@ -717,8 +717,8 @@ class LocationsPage(QWizardPage):
 
         storage_row = QHBoxLayout()
         storage_row.setSpacing(4)
-        self._storage_label = QLabel("Dostupan prostor: —")
-        self._storage_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        self._storage_label = QLabel("Available space: —")
+        self._storage_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         storage_row.addWidget(self._storage_label)
         storage_row.addStretch()
         self._storage_value = QLabel("—")
@@ -755,9 +755,9 @@ class LocationsPage(QWizardPage):
         )
         layout = QHBoxLayout(info)
         layout.setContentsMargins(10, 10, 10, 10)
-        label = QLabel("Potreban prostor za model: ~4.7 GB")
-        label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px;")
-        status = QLabel("✓ Dovoljno prostora")
+        label = QLabel("Required space for the model: ~4.7 GB")
+        label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
+        status = QLabel("✓ Sufficient space")
         status.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 10px; font-weight: 600;")
         layout.addWidget(label)
         layout.addStretch()
@@ -768,12 +768,12 @@ class LocationsPage(QWizardPage):
         return Qt.CursorShape.PointingHandCursor
 
     def _on_browse_app(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Izaberite lokaciju za instalaciju")
+        directory = QFileDialog.getExistingDirectory(self, "Choose the installation location")
         if directory:
             self._app_path_edit.setText(directory)
 
     def _on_browse_models(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Izaberite lokaciju za AI modele")
+        directory = QFileDialog.getExistingDirectory(self, "Choose the location for AI models")
         if directory:
             self._models_path_edit.setText(directory)
 
@@ -792,8 +792,8 @@ class LocationsPage(QWizardPage):
             usage = shutil.disk_usage(path)
             free_gb = usage.free / (1024**3)
             total_gb = usage.total / (1024**3)
-            self._storage_label.setText("Dostupan prostor na disku")
-            self._storage_value.setText(f"{free_gb:.1f} GB slobodno od {total_gb:.0f} GB")
+            self._storage_label.setText("Available disk space")
+            self._storage_value.setText(f"{free_gb:.1f} GB free of {total_gb:.0f} GB")
             used_pct = (usage.used / usage.total) * 100 if usage.total > 0 else 0
             bar_width = max(15, 100 - int(used_pct))
             self._storage_bar_fill.setStyleSheet(
@@ -813,7 +813,7 @@ class SummaryPage(QWizardPage):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setTitle("Pregled instalacije")
+        self.setTitle("Installation Review")
         self._layout = QVBoxLayout(self)
 
         self._ready_banner: QFrame | None = None
@@ -821,12 +821,12 @@ class SummaryPage(QWizardPage):
         self._capabilities: QFrame | None = None
         self._storage_info: QFrame | None = None
 
-        self._refresh_btn = QPushButton("Osveži podatke")
+        self._refresh_btn = QPushButton("Refresh data")
         self._refresh_btn.clicked.connect(self._on_refresh)
         self._refresh_btn.setStyleSheet(
             f"background: {_GRAPHITE_DARK_CARD}; color: {_TEXT_SECONDARY};"
             f"border: 1px solid {_GRAPHITE_BORDER}; border-radius: 5px;"
-            f"padding: 6px 12px; font-size: 9px;"
+            f"padding: 6px 12px; font-size: 11px;"
         )
         self._layout.addWidget(self._refresh_btn)
         self._layout.addStretch()
@@ -895,10 +895,10 @@ class SummaryPage(QWizardPage):
         )
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
-        title = QLabel("Sve je spremno")
+        title = QLabel("Everything is ready")
         title.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 11px; font-weight: 600;")
-        desc = QLabel("Vaš sistem zadovoljava zahteve i ima dovoljno prostora.")
-        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px; margin-top: 2px;")
+        desc = QLabel("Your system meets the requirements and has sufficient space.")
+        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; margin-top: 2px;")
         text_layout.addWidget(title)
         text_layout.addWidget(desc)
         layout.addWidget(icon)
@@ -913,9 +913,9 @@ class SummaryPage(QWizardPage):
         layout.setSpacing(8)
 
         cards = [
-            ("AI MODEL", model_name, "Preporučeno"),
-            ("APPLICATION", app_loc, "Aplikacija i komponente"),
-            ("AI MODELS", models_loc, "Lokacija modela · dovoljno prostora"),
+            ("AI MODEL", model_name, "Recommended"),
+            ("APPLICATION", app_loc, "Application and components"),
+            ("AI MODELS", models_loc, "Model location · sufficient space"),
             ("HARDWARE", self._format_hw(profile), self._format_rec(rec)),
         ]
 
@@ -945,11 +945,11 @@ class SummaryPage(QWizardPage):
         layout.setContentsMargins(11, 11, 11, 11)
         layout.setSpacing(4)
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        title_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         value_label = QLabel(value)
         value_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 11px; font-weight: 600;")
         detail_label = QLabel(detail)
-        detail_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px; margin-top: 3px;")
+        detail_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px; margin-top: 3px;")
         layout.addWidget(title_label)
         layout.addWidget(value_label)
         layout.addWidget(detail_label)
@@ -980,10 +980,10 @@ class SummaryPage(QWizardPage):
             label.setStyleSheet(
                 f"background: rgba(29, 138, 104, 0.12);"
                 f"color: {color};"
-                f"border-radius: 4px; padding: 4px 7px; font-size: 8px; font-weight: 600;"
+                f"border-radius: 4px; padding: 4px 7px; font-size: 10px; font-weight: 600;"
                 if cls == "active"
                 else f"background: rgba(89, 98, 95, 0.12); color: {color};"
-                f"border-radius: 4px; padding: 4px 7px; font-size: 8px; font-weight: 600;"
+                f"border-radius: 4px; padding: 4px 7px; font-size: 10px; font-weight: 600;"
             )
             layout.addWidget(label)
         return caps
@@ -998,9 +998,9 @@ class SummaryPage(QWizardPage):
         )
         layout = QHBoxLayout(info)
         layout.setContentsMargins(10, 10, 10, 10)
-        left = QLabel("Instalaciona veličina: ~5.2 GB")
-        left.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
-        right = QLabel("✓ Dovoljno prostora")
+        left = QLabel("Installation size: ~5.2 GB")
+        left.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        right = QLabel("✓ Sufficient space")
         right.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 10px; font-weight: 600;")
         layout.addWidget(left)
         layout.addStretch()
@@ -1018,7 +1018,7 @@ class InstallationPage(QWizardPage):
         self, model_manager: ModelManager, event_bus: EventBus, parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
-        self.setTitle("Instalacija")
+        self.setTitle("Installation")
         self._manager = model_manager
         self._event_bus = event_bus
         self._cancelled = False
@@ -1027,7 +1027,7 @@ class InstallationPage(QWizardPage):
         layout = QVBoxLayout(self)
 
         header = QHBoxLayout()
-        self._header_title = QLabel("Instaliranje Offline AI Assistant")
+        self._header_title = QLabel("Installing Offline AI Assistant")
         self._header_title.setStyleSheet(
             f"color: {_TEXT_PRIMARY}; font-size: 13px; font-weight: 500;"
         )
@@ -1039,9 +1039,9 @@ class InstallationPage(QWizardPage):
         layout.addLayout(header)
 
         desc = QLabel(
-            "Sačekajte dok se aplikacija i izabrani AI model "
-            "instaliraju i provere. Ovaj proces može potrajati "
-            "nekoliko minuta u zavisnosti od skladišnog prostora i brzine interneta."
+            "Please wait while the application and the selected AI model "
+            "are installed and verified. This process may take "
+            "several minutes depending on storage space and internet speed."
         )
         desc.setWordWrap(True)
         desc.setStyleSheet(
@@ -1069,14 +1069,14 @@ class InstallationPage(QWizardPage):
         bottom = QHBoxLayout()
         bottom.setContentsMargins(0, 14, 0, 0)
         bottom.addStretch()
-        self._cancel_btn = QPushButton("Otkaži instalaciju")
+        self._cancel_btn = QPushButton("Cancel installation")
         self._cancel_btn.setObjectName("secondary_button")
         self._cancel_btn.clicked.connect(self._on_cancel)
         bottom.addWidget(self._cancel_btn)
         layout.addLayout(bottom)
 
-        # Installacione faze su definisane od starta — _tick_installation i
-        # _on_cancelled_ui moraju biti upotrebljivi i pre initializePage().
+        # Installation phases are defined from the start — _tick_installation and
+        # _on_cancelled_ui must be usable even before initializePage().
         self._phase_progress = [0, 20, 35, 80, 92]
         self._phase_end = [20, 35, 80, 92, 100]
         self._install_results: list[str] = []
@@ -1104,12 +1104,12 @@ class InstallationPage(QWizardPage):
 
         text_layout = QVBoxLayout()
         text_layout.setSpacing(3)
-        self._task_title = QLabel("Priprema instalaciju")
+        self._task_title = QLabel("Preparing installation")
         self._task_title.setStyleSheet(
             f"color: {_EMERALD_TEXT}; font-size: 11px; font-weight: 600;"
         )
-        self._task_desc = QLabel("Priprema Offline AI Assistant za lokalnu upotrebu.")
-        self._task_desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        self._task_desc = QLabel("Preparing Offline AI Assistant for local use.")
+        self._task_desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         text_layout.addWidget(self._task_title)
         text_layout.addWidget(self._task_desc)
 
@@ -1129,11 +1129,11 @@ class InstallationPage(QWizardPage):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(4)
 
-        label = QLabel("O vašem izabranom modelu")
+        label = QLabel("About your selected model")
         label.setStyleSheet(
-            f"color: {_TEXT_MUTED}; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;"
+            f"color: {_TEXT_MUTED}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;"
         )
-        self._insight_text = QLabel("Vaš lokalni AI okruženje priprema se za prvo pokretanje.")
+        self._insight_text = QLabel("Your local AI environment is being prepared for first launch.")
         self._insight_text.setStyleSheet(
             f"color: {_TEXT_SECONDARY}; font-size: 10px; line-height: 1.4;"
         )
@@ -1150,7 +1150,7 @@ class InstallationPage(QWizardPage):
         layout.setSpacing(7)
 
         header = QHBoxLayout()
-        self._progress_label = QLabel("Napredovanje instalacije")
+        self._progress_label = QLabel("Installation progress")
         self._progress_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px;")
         self._progress_percent = QLabel("0%")
         self._progress_percent.setStyleSheet(
@@ -1174,11 +1174,11 @@ class InstallationPage(QWizardPage):
 
         self._download_details = QHBoxLayout()
         self._downloaded_label = QLabel("—")
-        self._downloaded_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        self._downloaded_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         self._speed_label = QLabel("")
-        self._speed_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        self._speed_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         self._eta_label = QLabel("")
-        self._eta_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        self._eta_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         self._download_details.addWidget(self._downloaded_label)
         self._download_details.addStretch()
         self._download_details.addWidget(self._speed_label)
@@ -1197,13 +1197,13 @@ class InstallationPage(QWizardPage):
         )
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(9, 9, 9, 9)
-        self._file_name = QLabel("Priprema...")
-        self._file_name.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px;")
+        self._file_name = QLabel("Preparing...")
+        self._file_name.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         layout.addWidget(self._file_name)
         layout.addStretch()
         self._file_status = QLabel("")
         self._file_status.setStyleSheet(
-            f"color: {_EMERALD_TEXT}; font-size: 9px; font-weight: 600;"
+            f"color: {_EMERALD_TEXT}; font-size: 11px; font-weight: 600;"
         )
         layout.addWidget(self._file_status)
         return frame
@@ -1215,7 +1215,7 @@ class InstallationPage(QWizardPage):
         layout.setSpacing(7)
 
         self._step_widgets: list[tuple[QFrame, QLabel, QLabel]] = []
-        step_names = ["Aplikacija", "Zavisnosti", "AI Model", "Verifikacija", "Finalizacija"]
+        step_names = ["Application", "Dependencies", "AI Model", "Verification", "Finalization"]
         for name in step_names:
             step = self._build_install_step(name)
             layout.addWidget(step)
@@ -1233,8 +1233,8 @@ class InstallationPage(QWizardPage):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
         name_label = QLabel(name)
-        name_label.setStyleSheet(f"color: {_TEXT_DARK}; font-size: 8px;")
-        status_label = QLabel("Čekanje")
+        name_label.setStyleSheet(f"color: {_TEXT_DARK}; font-size: 10px;")
+        status_label = QLabel("Waiting")
         status_label.setStyleSheet(f"color: {_TEXT_DARK}; font-size: 7px; font-weight: 600;")
         layout.addWidget(name_label)
         layout.addWidget(status_label)
@@ -1253,26 +1253,26 @@ class InstallationPage(QWizardPage):
         self._models_location = models_loc
         self._progress = 0.0
         self._cancelled = False
-        self._file_status.setText("Spremno")
+        self._file_status.setText("Ready")
         self._file_name.setText(f"{selected_model} — ~4.7 GB")
         self._start_installation()
 
     def _start_installation(self) -> None:
-        """Pokreće instalaciju sa STVARNIM akcijama po fazama.
+        """Starts the installation with REAL actions per phase.
 
-        Faza 5.3 (docs/project_plan.md): simulacija zamenjena pravim
-        koracima — provere foldera, verifikacija GGUF modela (magic bytes +
-        metadata), konfiguracija search path-ova. Model download se radi
-        SAMO ako izabrani model ne postoji lokalno.
+        Phase 5.3 (docs/project_plan.md): the simulation was replaced with real
+        steps — folder checks, GGUF model verification (magic bytes +
+        metadata), search path configuration. The model is downloaded
+        ONLY if the selected model does not exist locally.
         """
         from PySide6.QtCore import QTimer
 
         phases = [
-            ("Instaliranje aplikacije", " Kopiranje fajlova aplikacije", "Aplikacija", "done"),
-            ("Instaliranje zavisnosti", " Zaštita lokalnih komponenti", "Zavisnosti", "done"),
-            ("Priprema AI modela", " Provera i konfiguracija lokalnog modela", "AI Model", "active"),
-            ("Provera AI modela", " Provera integriteta modela", "Verifikacija", ""),
-            ("Finalizacija", " Pripremanje Offline AI Assistant", "Finalizacija", ""),
+            ("Installing application", " Copying application files", "Application", "done"),
+            ("Installing dependencies", " Protecting local components", "Dependencies", "done"),
+            ("Preparing AI model", " Checking and configuring the local model", "AI Model", "active"),
+            ("Verifying AI model", " Verifying model integrity", "Verification", ""),
+            ("Finalization", " Preparing Offline AI Assistant", "Finalization", ""),
         ]
 
         self._phase_index = 0
@@ -1282,48 +1282,48 @@ class InstallationPage(QWizardPage):
         self._install_results: list[str] = []
 
         for i, (_step_widget, _, status_label) in enumerate(self._step_widgets):
-            status_label.setText("Aktivno" if i == 2 else "Čekanje")
+            status_label.setText("Active" if i == 2 else "Waiting")
 
         self._timer = QTimer(parent=self)
         self._timer.timeout.connect(self._tick_installation)
         self._timer.start(300)
 
     # ------------------------------------------------------------------ #
-    # Stvarne instalacione akcije (Faza 5.3)
+    # Real installation actions (Phase 5.3)
     # ------------------------------------------------------------------ #
 
     def _real_step_app(self) -> str:
-        """Faza 1: provera da aplikacioni folderi postoje (runtime lokacije)."""
+        """Phase 1: check that application folders exist (runtime locations)."""
         from core.paths import CONFIG_DIR, DATA_DIR, LOGS_DIR, MODELS_DIR
 
         for path in (CONFIG_DIR, DATA_DIR, LOGS_DIR, MODELS_DIR):
             path.mkdir(parents=True, exist_ok=True)
-        return "Aplikacioni folderi spremni (config, data, logs, models)"
+        return "Application folders ready (config, data, logs, models)"
 
     def _real_step_dependencies(self) -> str:
-        """Faza 2: provera ključnih lokalnih komponenti."""
+        """Phase 2: check key local components."""
         notes = []
         try:
             import PySide6  # noqa: F401
 
             notes.append("PySide6 OK")
         except ImportError:
-            notes.append("PySide6 nedostaje")
+            notes.append("PySide6 missing")
         try:
             from ai.models.model_loader import has_llama_cpp
 
-            notes.append("llama-cpp-python OK" if has_llama_cpp() else "llama-cpp-python nije dostupan (CPU/stub mod)")
+            notes.append("llama-cpp-python OK" if has_llama_cpp() else "llama-cpp-python not available (CPU/stub mode)")
         except Exception:
-            notes.append("AI runtime provera preskočena")
+            notes.append("AI runtime check skipped")
         try:
 
             notes.append("SQLite OK")
         except Exception:
-            notes.append("SQLite nedostupan")
+            notes.append("SQLite unavailable")
         return " · ".join(notes)
 
     def _real_step_model(self) -> str:
-        """Faza 3: pronalaženje izabranog modela; preuzimanje samo ako fali."""
+        """Phase 3: find the selected model; download only if missing."""
         model_name = self._selected_model_name or ""
         models_loc = self._models_location or ""
         if model_name and self._manager is not None:
@@ -1332,18 +1332,18 @@ class InstallationPage(QWizardPage):
                 for info in self._manager.list_models():
                     if model_name.lower() in info.name.lower():
                         size_gb = info.size_mb / 1024
-                        return f"Model '{info.name}' pronadjen ({size_gb:.1f} GB) — {info.path}"
+                        return f"Model '{info.name}' found ({size_gb:.1f} GB) — {info.path}"
             except Exception as exc:
                 return f"Model discovery: {exc}"
         if models_loc:
-            return f"Modeli se koriste iz: {models_loc}"
-        return "Model nije specificiran — koristi se default discovery"
+            return f"Models will be used from: {models_loc}"
+        return "No model specified — using default discovery"
 
     def _real_step_verify(self) -> str:
-        """Faza 4: verifikacija GGUF integriteta (magic bytes + metadata)."""
+        """Phase 4: verify GGUF integrity (magic bytes + metadata)."""
         model_name = self._selected_model_name or ""
         if self._manager is None:
-            return "Verifikacija preskočena (nema managera)"
+            return "Verification skipped (no manager)"
         try:
             for info in self._manager.list_models():
                 if model_name and model_name.lower() not in info.name.lower():
@@ -1352,15 +1352,15 @@ class InstallationPage(QWizardPage):
 
                 meta = _read_gguf_metadata(info.path)
                 if meta is None:
-                    return f"Model {info.name}: GGUF metadata nečitljiv"
+                    return f"Model {info.name}: GGUF metadata unreadable"
                 arch = meta.get("general.architecture", "?")
-                return f"Model {info.name}: integritet OK (arch={arch})"
-            return "Nijedan model za verifikaciju — stub mod"
+                return f"Model {info.name}: integrity OK (arch={arch})"
+            return "No model to verify — stub mode"
         except Exception as exc:
-            return f"Verifikacija: {exc}"
+            return f"Verification: {exc}"
 
     def _real_step_finalize(self) -> str:
-        """Faza 5: config provere (first_run, search paths)."""
+        """Phase 5: config checks (first_run, search paths)."""
         notes = []
         try:
             from core.config_manager import ConfigManager
@@ -1369,18 +1369,18 @@ class InstallationPage(QWizardPage):
             search_paths = config.get("ai.model_search_paths", [])
             notes.append(f"search paths: {len(search_paths)}")
         except Exception:
-            notes.append("config nedostupan")
+            notes.append("config unavailable")
         try:
             if self._manager is not None and self._manager.list_models():
-                notes.append("model discovery spreman")
+                notes.append("model discovery ready")
             else:
-                notes.append("stub mod (bez modela)")
+                notes.append("stub mode (no models)")
         except Exception:
-            notes.append("manager provera preskočena")
+            notes.append("manager check skipped")
         return " · ".join(notes)
 
     def _tick_installation(self) -> None:
-        """Timer tick: izvršava STVARNU akciju tekuće faze i pomera progres."""
+        """Timer tick: runs the REAL action of the current phase and advances progress."""
         if self._cancelled:
             self._on_cancelled_ui()
             return
@@ -1391,7 +1391,7 @@ class InstallationPage(QWizardPage):
             self._on_installation_complete()
             return
 
-        # Odredi fazu po progresu
+        # Determine the phase by progress
         phase_idx = 0
         for i, (start, end) in enumerate(zip(self._phase_progress, self._phase_end, strict=False)):
             if start <= self._progress < end:
@@ -1409,13 +1409,13 @@ class InstallationPage(QWizardPage):
         try:
             result = action()
         except Exception as exc:
-            result = f"preskočeno: {exc}"
+            result = f"skipped: {exc}"
 
-        # Akcija se izvršava jednom po fazi — beležimo rezultat
+        # The action runs once per phase — record the result
         if len(self._install_results) <= phase_idx:
             self._install_results.append(result)
 
-        # Brzina napretka: aplikacija/dependencies brzo, model/verify malo duže
+        # Progress speed: application/dependencies fast, model/verify a bit longer
         step = 3.5 if phase_idx in (0, 1, 4) else 2.0
         self._progress = min(100.0, self._progress + step)
         self._update_phases()
@@ -1424,20 +1424,20 @@ class InstallationPage(QWizardPage):
         self._progress_percent.setText(f"{int(self._progress)}%")
 
     def _update_real_progress_labels(self, phase_idx: int, result: str) -> None:
-        """Ažurira download/file label-e stvarnim rezultatima (ne lažnim GB)."""
+        """Updates download/file labels with real results (not fake GB)."""
         phase_labels = [
-            ("Aplikacija", "✓ Spremno"),
-            ("Zavisnosti", "✓ Spremno"),
-            ("AI Model", "Aktivno"),
-            ("Verifikacija", "Aktivno"),
-            ("Finalizacija", "Aktivno"),
+            ("Application", "✓ Ready"),
+            ("Dependencies", "✓ Ready"),
+            ("AI Model", "Active"),
+            ("Verification", "Active"),
+            ("Finalization", "Active"),
         ]
         if self._progress >= 100:
-            self._downloaded_label.setText("Instalacija završena")
+            self._downloaded_label.setText("Installation complete")
             self._speed_label.setText("")
-            self._eta_label.setText("Spremno")
-            self._file_name.setText("Instalacija završena")
-            self._file_status.setText("✓ Gotovo")
+            self._eta_label.setText("Ready")
+            self._file_name.setText("Installation complete")
+            self._file_status.setText("✓ Done")
         else:
             name, status = phase_labels[phase_idx]
             self._downloaded_label.setText(f"{name}: {result[:60]}" if result else name)
@@ -1449,57 +1449,57 @@ class InstallationPage(QWizardPage):
     def _on_cancelled_ui(self) -> None:
         if self._timer is not None:
             self._timer.stop()
-        self._task_title.setText("Instalacija otkazana")
-        self._task_desc.setText("Instalacija je otkazana od strane korisnika.")
-        self._insight_text.setText("Nema daljih akcija instalacije.")
+        self._task_title.setText("Installation cancelled")
+        self._task_desc.setText("The installation was cancelled by the user.")
+        self._insight_text.setText("No further installation actions.")
         self._progress_percent.setText("0%")
         self._progress_bar.setValue(0)
-        self._downloaded_label.setText("Instalacija otkazana")
+        self._downloaded_label.setText("Installation cancelled")
         self._speed_label.setText("")
-        self._eta_label.setText("Otkaženo")
-        self._file_name.setText("Instalacija otkazana")
-        self._file_status.setText("Otkazano")
+        self._eta_label.setText("Cancelled")
+        self._file_name.setText("Installation cancelled")
+        self._file_status.setText("Cancelled")
 
     def _update_phases(self) -> None:
         phase_names = [
-            "Instaliranje aplikacije",
-            "Instaliranje zavisnosti",
-            "Priprema AI modela",
-            "Provera AI modela",
-            "Finalizacija",
+            "Installing application",
+            "Installing dependencies",
+            "Preparing AI model",
+            "Verifying AI model",
+            "Finalization",
         ]
         phase_descs = [
-            "Kopiranje fajlova aplikacije",
-            "Zaštita lokalnih komponenti",
-            "Provera i konfiguracija lokalnog modela",
-            "Provera integriteta modela",
-            "Pripremanje Offline AI Assistant",
+            "Copying application files",
+            "Protecting local components",
+            "Checking and configuring the local model",
+            "Verifying model integrity",
+            "Preparing Offline AI Assistant",
         ]
         phase_insights = [
-            "Lokalna AI aplikacija se priprema za upotrebu.",
-            "Potrebne komponente su instalirane lokalno.",
-            "Vaš model je optimizovan za lokalnu tekstualnu i kod generaciju sa GPU akceleracijom.",
-            "Preuzeti model se proverava radi potpunosti instalacije.",
-            "Vaše lokalno AI okruženje finalizuje se za prvo pokretanje.",
+            "The local AI application is being prepared for use.",
+            "Required components are installed locally.",
+            "Your model is optimized for local text and code generation with GPU acceleration.",
+            "The downloaded model is being verified for installation completeness.",
+            "Your local AI environment is being finalized for first launch.",
         ]
 
         for i, (_name, _, status_label) in enumerate(self._step_widgets):
             if self._progress > self._phase_end[i]:
-                status_label.setText("Gotovo")
+                status_label.setText("Done")
                 self._step_widgets[i][0].setStyleSheet(
                     "background: rgba(29, 138, 104, 0.14);"
                     "border: 1px solid rgba(29, 138, 104, 0.35);"
                     "border-radius: 6px; padding: 8px 6px; text-align: center; min-width: 100px;"
                 )
             elif self._progress >= self._phase_progress[i] and self._progress < self._phase_end[i]:
-                status_label.setText("Aktivno")
+                status_label.setText("Active")
                 self._step_widgets[i][0].setStyleSheet(
                     "background: rgba(29, 138, 104, 0.08);"
                     "border: 1px solid rgba(29, 138, 104, 0.25);"
                     "border-radius: 6px; padding: 8px 6px; text-align: center; min-width: 100px;"
                 )
             else:
-                status_label.setText("Čekanje")
+                status_label.setText("Waiting")
 
         for i, (start, end) in enumerate(zip(self._phase_progress, self._phase_end, strict=False)):
             if start <= self._progress < end:
@@ -1510,24 +1510,24 @@ class InstallationPage(QWizardPage):
 
     def _on_installation_complete(self) -> None:
         for step_widget, _, status_label in self._step_widgets:
-            status_label.setText("Gotovo")
+            status_label.setText("Done")
             step_widget.setStyleSheet(
                 "background: rgba(29, 138, 104, 0.14);"
                 "border: 1px solid rgba(29, 138, 104, 0.35);"
                 "border-radius: 6px; padding: 8px 6px; text-align: center; min-width: 100px;"
             )
-        self._task_title.setText("Instalacija završena")
-        self._task_desc.setText("Offline AI Assistant je spreman za upotrebu.")
+        self._task_title.setText("Installation complete")
+        self._task_desc.setText("Offline AI Assistant is ready for use.")
         self._insight_text.setText(
-            "Vaš asistent je instaliran lokalno i spreman za prvo pokretanje 100% offline."
+            "Your assistant is installed locally and ready for its first 100% offline launch."
         )
         self._progress_bar.setValue(100)
         self._progress_percent.setText("100%")
-        self._downloaded_label.setText("Instalacija završena")
+        self._downloaded_label.setText("Installation complete")
         self._speed_label.setText("")
-        self._eta_label.setText("Spremno")
-        self._file_name.setText("Instalacija uspešno završena")
-        self._file_status.setText("✓ Gotovo")
+        self._eta_label.setText("Ready")
+        self._file_name.setText("Installation successfully completed")
+        self._file_status.setText("✓ Done")
 
         wizard = self.wizard()
         if wizard:
@@ -1542,7 +1542,7 @@ class CompletePage(QWizardPage):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setTitle("Instalacija završena")
+        self.setTitle("Installation Complete")
         self._selected_model_name = "Qwen 2.5 7B — Q4_K_M"
         self._app_location = "C:\\Program Files\\Offline AI Assistant"
         self._models_location = str(MODELS_DIR)
@@ -1593,7 +1593,7 @@ class CompletePage(QWizardPage):
         icon.setAlignment(self._center())
         success_layout.addWidget(icon)
 
-        title = QLabel("Instalacija završena")
+        title = QLabel("Installation Complete")
         title.setStyleSheet(
             f"margin: 0; font-size: 25px; font-weight: 500; color: {_TEXT_PRIMARY};"
         )
@@ -1601,7 +1601,7 @@ class CompletePage(QWizardPage):
         success_layout.addWidget(title)
 
         desc = QLabel(
-            "Offline AI Assistant je uspešno instaliran i spreman za pokretanje na vašem računaru."
+            "Offline AI Assistant has been successfully installed and is ready to run on your computer."
         )
         desc.setStyleSheet(
             f"margin-top: 7px; color: {_TEXT_SECONDARY}; font-size: 11px;"
@@ -1614,7 +1614,7 @@ class CompletePage(QWizardPage):
         badge.setStyleSheet(
             f"margin-top: 13px; padding: 6px 11px;"
             f"background: {_EMERALD_BG_TINT}; border: 1px solid {_EMERALD_BORDER_TINT};"
-            f"color: {_EMERALD_TEXT}; font-size: 9px; font-weight: 700;"
+            f"color: {_EMERALD_TEXT}; font-size: 11px; font-weight: 700;"
         )
         badge.setAlignment(self._center())
         success_layout.addWidget(badge)
@@ -1636,7 +1636,7 @@ class CompletePage(QWizardPage):
         bottom.setContentsMargins(0, 14, 0, 0)
         bottom.addStretch()
 
-        open_btn = QPushButton("Otvori instalacioni folder")
+        open_btn = QPushButton("Open installation folder")
         open_btn.setObjectName("secondary_button")
         open_btn.clicked.connect(self._on_open_folder)
         open_btn.setStyleSheet(
@@ -1646,7 +1646,7 @@ class CompletePage(QWizardPage):
         )
         open_btn.setCursor(self._cursor_pointer())
 
-        launch_btn = QPushButton("Pokreni Offline AI Assistant")
+        launch_btn = QPushButton("Launch Offline AI Assistant")
         launch_btn.setObjectName("primary_button")
         launch_btn.clicked.connect(self._on_launch)
         launch_btn.setStyleSheet(
@@ -1673,10 +1673,10 @@ class CompletePage(QWizardPage):
         layout.setSpacing(8)
 
         cards = [
-            ("AI MODEL", model, "Model je gotov · GPU akceleracija"),
-            ("APPLICATION LOCATION", app_loc, "Aplikacija uspešno instalirana"),
-            ("AI MODELS LOCATION", models_loc, "Model uspešno preuzet"),
-            ("INSTALLATION VERSION", "Offline AI Assistant v1.2.0", "Instalacija uspešno završena"),
+            ("AI MODEL", model, "Model ready · GPU acceleration"),
+            ("APPLICATION LOCATION", app_loc, "Application successfully installed"),
+            ("AI MODELS LOCATION", models_loc, "Model successfully downloaded"),
+            ("INSTALLATION VERSION", "Offline AI Assistant v1.2.0", "Installation successfully completed"),
         ]
 
         for title, value, detail in cards:
@@ -1689,12 +1689,12 @@ class CompletePage(QWizardPage):
             card_layout.setContentsMargins(11, 11, 11, 11)
             card_layout.setSpacing(4)
             title_label = QLabel(title)
-            title_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 8px;")
+            title_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px;")
             value_label = QLabel(value)
             value_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 10px; font-weight: 600;")
             detail_label = QLabel(detail)
             detail_label.setStyleSheet(
-                f"color: {_TEXT_SECONDARY}; font-size: 8px; margin-top: 3px;"
+                f"color: {_TEXT_SECONDARY}; font-size: 10px; margin-top: 3px;"
             )
             card_layout.addWidget(title_label)
             card_layout.addWidget(value_label)
@@ -1712,12 +1712,12 @@ class CompletePage(QWizardPage):
         )
         layout = QHBoxLayout(status)
         layout.setContentsMargins(10, 10, 10, 10)
-        left = QLabel("Izabrani model: Qwen 2.5 7B — Q4_K_M")
-        left.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px;")
-        left.setText("Izabrani model: <strong>" + self._get_model_name() + "</strong>")
+        left = QLabel("Selected model: Qwen 2.5 7B — Q4_K_M")
+        left.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
+        left.setText("Selected model: <strong>" + self._get_model_name() + "</strong>")
         left.setTextFormat(Qt.TextFormat.RichText)
         right = QLabel("✓ READY")
-        right.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 9px; font-weight: 600;")
+        right.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 11px; font-weight: 600;")
         layout.addWidget(left)
         layout.addStretch()
         layout.addWidget(right)
@@ -1744,12 +1744,12 @@ class CompletePage(QWizardPage):
         icon = QLabel("🔒")
         icon.setStyleSheet(f"color: {_EMERALD_TEXT}; font-size: 13px;")
         text = QLabel(
-            "<strong>Vaša privatnost je zaštićena.</strong><br>"
-            "Offline AI Assistant radi lokalno na vašem računaru. "
-            "Vaše konverzacije i lični podaci ostaju na vašem uređaju "
-            "i ne šalju se na eksterne servise ili oblake."
+            "<strong>Your privacy is protected.</strong><br>"
+            "Offline AI Assistant runs locally on your computer. "
+            "Your conversations and personal data stay on your device "
+            "and are not sent to external services or clouds."
         )
-        text.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px; line-height: 1.4;")
+        text.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px; line-height: 1.4;")
         text.setWordWrap(True)
         layout.addWidget(icon)
         layout.addWidget(text)
@@ -1790,7 +1790,7 @@ class WelcomeWizard(QWizard):
 
         self.setStyleSheet(WIZARD_STYLE)
         self._build_sidebar()
-        # Dinamički step indikator: highlight trenutnog koraka u sidebaru
+        # Dynamic step indicator: highlights the current step in the sidebar
         self.currentIdChanged.connect(self._update_step_highlight)
         self._update_step_highlight(0)
 
@@ -1848,13 +1848,13 @@ class WelcomeWizard(QWizard):
 
         self._step_entries: list[tuple[QLabel, QLabel]] = []
         step_names = [
-            ("1", "Dobrodošli"),
-            ("2", "Provera hardvera"),
+            ("1", "Welcome"),
+            ("2", "Hardware check"),
             ("3", "AI model"),
-            ("4", "Lokacije"),
-            ("5", "Pregled"),
-            ("6", "Instalacija"),
-            ("7", "Završeno"),
+            ("4", "Locations"),
+            ("5", "Review"),
+            ("6", "Installation"),
+            ("7", "Done"),
         ]
         for num, label in step_names:
             entry = QHBoxLayout()
@@ -1872,10 +1872,10 @@ class WelcomeWizard(QWizard):
             layout.addLayout(entry)
             self._step_entries.append((icon, text))
 
-        self._sidebar_ref = sidebar  # čuva sidebar živim kroz Python referencu
+        self._sidebar_ref = sidebar  # keeps the sidebar alive through the Python reference
 
         layout.addStretch()
-        footer = QLabel("100% Offline\nVaši podaci ostaju lokalno")
+        footer = QLabel("100% Offline\nYour data stays local")
         footer.setStyleSheet(f"color: {_TEXT_DARK}; font-size: 10px; line-height: 1.6;")
         footer.setWordWrap(True)
         layout.addWidget(footer)
@@ -1883,9 +1883,9 @@ class WelcomeWizard(QWizard):
         self.setSideWidget(sidebar)
 
     def _update_step_highlight(self, page_id: int) -> None:
-        """Ažuriraj sidebar step stanja: completed ✓ / current ● / default ○.
+        """Update sidebar step states: completed ✓ / current ● / default ○.
 
-        Poziva se na currentIdChanged — step liste prate dizajn iz
+        Called on currentIdChanged — the step lists follow the design from
         official_theme_preview (completed #245846/✓, current emerald tint).
         """
         from PySide6.QtWidgets import QLabel as _QLabel  # noqa: F401

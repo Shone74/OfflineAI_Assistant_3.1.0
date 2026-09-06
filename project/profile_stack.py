@@ -1,4 +1,4 @@
-"""Profile stacking mechanism for FAZA 13.4.
+"""Profile stacking mechanism for Phase 13.4.
 
 This module provides the ProfileStack class that resolves an effective
 assistant profile from multiple override layers:

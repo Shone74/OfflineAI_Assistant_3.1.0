@@ -157,7 +157,7 @@ class VoiceManager:
         self._stt: STTProvider = stt or create_stt()
         self._tts: TTSProvider = tts or create_tts()
         self._config: ConfigManager | None = config if isinstance(config, ConfigManager) else None
-        # wake word se kreira NAKON _config (čita voice.wake_word iz configa)
+        # wake word is created AFTER _config (reads voice.wake_word from config)
         self._wake: WakeWordProvider = wake or self._create_wake_word_from_config()
         self._record_fn = record_fn
         self._audio: AudioManager = audio_manager or create_audio()
@@ -168,11 +168,11 @@ class VoiceManager:
         self._pending_startup_errors: list[dict[str, Any]] = []
         self._listening = False
         self._initialized = False
-        # --- Wake word refractory (sprečava burst trigera iz jedne fraze) ---
+        # --- Wake word refractory (prevents a burst of triggers from one phrase) ---
         self._wake_cooldown_active = False
-        # --- Echo zaštita: wake word ugašen tokom TTS-a (§8) ---
+        # --- Echo protection: wake word disabled during TTS (§8) ---
         self._wake_suppressed_for_tts = False
-        # --- Automatic Listening session state (Faza 7) ---
+        # --- Automatic Listening session state (Phase 7) ---
         self._auto_session = False
         self._auto_watchdog = None
         self._auto_buffer_marker = 0
@@ -206,16 +206,16 @@ class VoiceManager:
             )
 
     def _create_wake_word_from_config(self) -> WakeWordProvider:
-        """Kreiraj wake-word provider iz konfiguracije.
+        """Create the wake-word provider from configuration.
 
-        Config šema (voice.wake_word):
-            enabled  — bool (default True; koristi application bootstrap)
+        Config schema (voice.wake_word):
+            enabled  — bool (default True; used by application bootstrap)
             provider — "openwakeword" | "stub" (default "openwakeword")
-            hotword  — fraza (default "hey_jarvis")
-            threshold — score prag 0..1 (default 0.5)
+            hotword  — phrase (default "hey_jarvis")
+            threshold — score threshold 0..1 (default 0.5)
 
-        "hey_jarvis" je openwakeword-ova predefinisana "hey jarvis" labela —
-        default fraza za ovaj projekat (specifikacija §1).
+        "hey_jarvis" is openwakeword's predefined "hey jarvis" label —
+        the default phrase for this project (specification §1).
         """
 
         hotword = "hey_jarvis"
@@ -800,21 +800,22 @@ class VoiceManager:
         return True
 
     # ------------------------------------------------------------------ #
-    # Automatic Listening (Faza 7) — auto sesije sa silence watchdog-om
+    # Automatic Listening (Phase 7) — auto sessions with silence watchdog
     # ------------------------------------------------------------------ #
 
     def begin_auto_recording(self, silence_timeout_s: float = 3.0) -> bool:
-        """Započni AUTOMATSKU sesiju snimanja (Automatic Listening).
+        """Start an AUTOMATIC recording session (Automatic Listening).
 
-        Razlika od ručne sesije: pokreće se iz VoiceManager-a (ne klikom) i
-        nosi silence watchdog — kada korisnik prestane da govori (nema novog
-        audio chunk-a sa energijom ~tišina), sesija se sama finalizuje kao
-        da je korisnik kliknuo STOP (stop_and_transcribe).
+        Difference from a manual session: it is started from VoiceManager (not
+        by a click) and carries a silence watchdog — when the user stops
+        speaking (no new audio chunk with energy ~silence), the session
+        finalises itself as if the user had clicked STOP (stop_and_transcribe).
 
-        Watchdog je energy-based po buffer rastu: dok buffer raste, korisnik
-        verovatno govori; watchdog proverava svakih 500 ms — ako je ukupan
-        buffer nepromenjen duže od silence_timeout_s, smatra se kraj izjave.
-        (Puna RMS VAD detekcija je buduća nadogradnja — v. docs/current_status.)
+        The watchdog is energy-based on buffer growth: while the buffer grows,
+        the user is probably speaking; the watchdog checks every 500 ms — if
+        the total buffer is unchanged for longer than silence_timeout_s, the
+        end of the utterance is assumed.
+        (Full RMS VAD detection is a future upgrade — see docs/current_status.)
         """
         started = self.begin_recording()
         if not started:
@@ -848,7 +849,7 @@ class VoiceManager:
         self._auto_session = False
 
     def _on_auto_watchdog_tick(self) -> None:
-        """Watchdog tick: detektuj tišinu preko rasta audio buffer-a."""
+        """Watchdog tick: detect silence via audio buffer growth."""
         if self._state != VoiceState.RECORDING or not getattr(self, "_auto_session", False):
             self._stop_auto_watchdog()
             return
@@ -857,7 +858,7 @@ class VoiceManager:
         except Exception:
             marker = getattr(self, "_auto_buffer_marker", 0)
         if marker != getattr(self, "_auto_buffer_marker", -1):
-            # Buffer raste — korisnik govori (ili buka); resetuj tajmer tišine.
+            # Buffer is growing — the user is speaking (or noise); reset the silence timer.
             self._auto_buffer_marker = marker
             self._auto_last_change_ms = 0
             return
@@ -989,10 +990,11 @@ class VoiceManager:
         if self._state not in (VoiceState.IDLE, VoiceState.SPEAKING):
             logger.debug("speak() rejected — state=%s (not IDLE or SPEAKING)", self._state.value)
             return
-        # Echo zaštita (Faza 7, specifikacija §8): tokom TTS izlaza mikrofon
-        # ne sme čuti sopstveni govor — polu-dupleks pristup. Wake word se
-        # gasi na početku speak() i restartuje po završetku (_on_speak_finished).
-        # (Zvuk TTS-a iz zvučnika može okinuti wake word / ući u STT.)
+        # Echo protection (Phase 7, specification §8): during TTS output the
+        # microphone must not hear its own speech — half-duplex approach. The
+        # wake word is disabled at the start of speak() and restarted on
+        # completion (_on_speak_finished).
+        # (TTS sound from the speakers can trigger the wake word / enter STT.)
         self._wake_suppressed_for_tts = True
         self.stop_wake_word()
         self._state = VoiceState.SPEAKING
@@ -1027,8 +1029,8 @@ class VoiceManager:
         self._check_pending_tts_config()
         self._check_pending_stt_config()
         self._event_bus.publish("VOICE_PLAY_DONE", {})
-        # Echo zaštita (Faza 7): TTS završen → vrati wake word (ako je bio
-        # ugašen zbog TTS-a i ako je voice enabled u configu).
+        # Echo protection (Phase 7): TTS finished → restore the wake word (if it
+        # was disabled due to TTS and if voice is enabled in config).
         if getattr(self, "_wake_suppressed_for_tts", False):
             self._wake_suppressed_for_tts = False
             self._restart_wake_word_if_enabled()
@@ -1060,8 +1062,9 @@ class VoiceManager:
         and detection simply never fires.
         """
         if self._wake_cooldown_active:
-            # Refractory: nedavni trigger — ne restartuj detektor odmah da
-            # bismo sprečili burst ponovljenih detekcija iste izgovorene fraze.
+            # Refractory: recent trigger — do not restart the detector
+            # immediately to prevent a burst of repeated detections of the
+            # same spoken phrase.
             self._wake_cooldown_active = False
         try:
             self._wake.start(self._on_wake_word_detected)
@@ -1072,10 +1075,10 @@ class VoiceManager:
     def _on_wake_word_detected(self) -> None:
         """Publish WAKE_WORD_DETECTED — thread-safe (marshalled to owner thread).
 
-        Detektor poziva ovaj callback sa svog pozadinskog thread-a. Direktan
-        EventBus publish bi subscribere (Qt widgete) izvršavao na tom thread-u
-        — kršeći Qt thread-affinity. QMetaObject marshalling prebacuje poziv
-        na thread vlasnika VoiceManager-a (GUI).
+        The detector calls this callback from its background thread. A direct
+        EventBus publish would run subscribers (Qt widgets) on that thread —
+        violating Qt thread-affinity. QMetaObject marshalling moves the call
+        to the VoiceManager owner's (GUI) thread.
         """
         if self._wake_cooldown_active:
             logger.debug("Wake word trigger suppressed (refractory)")
@@ -1088,13 +1091,13 @@ class VoiceManager:
                 self, "_emitWakeWordDetected", Qt.ConnectionType.QueuedConnection
             )
         except Exception:
-            # Fallback: direktan publish (non-Qt okruženje/test bez QApplication)
+            # Fallback: direct publish (non-Qt environment/test without QApplication)
             self._emitWakeWordDetected()
 
     def _emitWakeWordDetected(self) -> None:
         """GUI-thread slot: publish WAKE_WORD_DETECTED + refractory reset."""
         self._event_bus.publish("WAKE_WORD_DETECTED", {})
-        # Refractory period: 2 s — jedna izgovorena fraza = jedan trigger.
+        # Refractory period: 2 s — one spoken phrase = one trigger.
         from PySide6.QtCore import QTimer
 
         QTimer.singleShot(2000, self._reset_wake_cooldown)
@@ -1114,7 +1117,7 @@ class VoiceManager:
         Called after a recording session ends (success or failure) so the
         system returns to hands-free wake-word listening rather than requiring
         a manual reclick.  Respects BOTH switches: ``voice.enabled`` (master)
-        and ``voice.wake_word.enabled`` (pod-podešavanje, Faza 7).
+        and ``voice.wake_word.enabled`` (sub-setting, Phase 7).
         When voice is disabled in config or the VoiceManager was not
         configured with a ConfigManager, this is a no-op.
         """
@@ -1135,7 +1138,7 @@ class VoiceManager:
         self._pending_tts_config = None
         self._pending_startup_errors.clear()
         self._unsubscribe_from_config()
-        # Automatic Listening watchdog mora stati PRE ostalih resursa (§11/§14)
+        # The Automatic Listening watchdog must stop BEFORE the other resources (§11/§14)
         self._stop_auto_watchdog()
         self.stop_listening()
         self.stop_wake_word()

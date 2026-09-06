@@ -1,4 +1,4 @@
-"""Project context — runtime state tracking and project-scoped context for FAZA 13.2.
+"""Project context — runtime state tracking and project-scoped context for Phase 13.2.
 
 This module provides:
 

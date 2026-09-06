@@ -210,11 +210,8 @@ class ApplicationManager:
             model_name = self._engine.model_name if self._engine else "N/A"
 
         lang_code = self._config.get("app.language", "en") if self._config else "en"
-        try:
-            language = Language.from_string(lang_code)
-        except ValueError:
-            language = Language.ENGLISH
-        
+        language = Language.from_string(lang_code)
+
         if language != TranslationManager.get_language():
             TranslationManager.set_language(language)
 
@@ -227,7 +224,6 @@ class ApplicationManager:
             model_name=model_name,
             model_capabilities=model_caps,
             model_status=model_status,
-            language=language,
         )
         result = dialog.exec()
         return result != 0
@@ -336,6 +332,17 @@ class ApplicationManager:
         self._db_manager = DatabaseManager()
         self._agent_repository = AgentRepository(self._db_manager, event_bus=self._event_bus)
 
+        # Seed built-in specialized agents (Researcher, Writer, Coder, ...)
+        # on first run — user-created/edited agents are never overwritten.
+        try:
+            from agent.defaults import seed_builtin_agents
+
+            seeded = seed_builtin_agents(self._agent_repository)
+            if seeded:
+                logger.info("Built-in agents ready (%d seeded)", seeded)
+        except Exception:
+            logger.warning("Built-in agent seeding skipped", exc_info=True)
+
         if self._tools is not None:
             from ai.engine.llm_engine import GenerationConfig
 
@@ -367,7 +374,7 @@ class ApplicationManager:
                 Workflow.of(
                     "system_check",
                     [{"tool": "system_info", "params": {}}],
-                    description="Prikaži sistemske informacije",
+                    description="Show system information",
                     event_bus=self._event_bus,
                 )
             )
@@ -519,7 +526,7 @@ class ApplicationManager:
             self._voice.audio_name,
         )
         if voice_cfg.get("enabled", True):
-            # Faza 7: wake word poštuje voice.wake_word.enabled pod-podešavanje
+            # Wake word respects the voice.wake_word.enabled sub-setting
             wake_cfg = voice_cfg.get("wake_word", {})
             if isinstance(wake_cfg, dict) and wake_cfg.get("enabled", True):
                 self._voice.start_wake_word()

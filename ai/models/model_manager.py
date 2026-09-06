@@ -62,6 +62,35 @@ def _is_test_mode() -> bool:
     return os.environ.get("OFFLINE_AI_TEST_MODE", "") == "1"
 
 
+def _find_mmproj_for(model: ModelInfo) -> Path | None:
+    """Locate a vision projector (mmproj*.gguf) next to a vision model.
+
+    Searches the model's own directory (and its parent for blob-style
+    stores) for files starting with ``mmproj``.  Returns ``None`` for
+    non-vision models or when no projector file is found — the model
+    then runs text-only.
+    """
+    if not (model.capabilities.vision or model.model_type == ModelType.VISION_LLM):
+        return None
+    try:
+        candidates: list[Path] = []
+        model_dir = model.path.parent
+        candidates.append(model_dir)
+        if model_dir.parent != model_dir:
+            candidates.append(model_dir.parent)
+        seen: set[Path] = set()
+        for directory in candidates:
+            if directory in seen or not directory.is_dir():
+                continue
+            seen.add(directory)
+            for entry in sorted(directory.glob("*.gguf")):
+                if entry.name.lower().startswith("mmproj"):
+                    return entry
+    except OSError:
+        return None
+    return None
+
+
 class ModelManager:
     """High-level manager over local model files and their loader.
 
@@ -181,7 +210,7 @@ class ModelManager:
         """
         model = self._find(name)
         if model is None:
-            raise ModelError(f"Model '{name}' nije pronađen u {self.models_dir}")
+            raise ModelError(f"Model '{name}' not found in {self.models_dir}")
 
         # Validate model type before attempting to load
         type_error = _validate_chat_model(model, _is_test_mode())
@@ -191,7 +220,7 @@ class ModelManager:
         if not has_llama_cpp():
             if _is_test_mode():
                 logger.warning(
-                    "TEST_MODE: llama-cpp-python nije instaliran — "
+                    "TEST_MODE: llama-cpp-python is not installed — "
                     "using stub loader for '%s'", model.name,
                 )
                 loader: ModelLoader = StubModelLoader()
@@ -206,6 +235,7 @@ class ModelManager:
             n_gpu_layers=self._n_gpu_layers,
             n_ctx=self._n_ctx,
             auto_gpu_layers=self._auto_gpu_layers,
+            mmproj_path=_find_mmproj_for(model),
         )
         try:
             loader.load(model.path)
@@ -248,7 +278,7 @@ class ModelManager:
         """
         model = self._find(name)
         if model is None:
-            raise ModelError(f"Model '{name}' nije pronađen u {self.models_dir}")
+            raise ModelError(f"Model '{name}' not found in {self.models_dir}")
 
         # Reject if a different model is already active — do NOT destroy or
         # replace the existing loader. The user must explicitly Unload first.
@@ -269,7 +299,7 @@ class ModelManager:
         if not has_llama_cpp():
             if _is_test_mode():
                 logger.warning(
-                    "TEST_MODE: llama-cpp-python nije instalaran — using stub loader for '%s'",
+                    "TEST_MODE: llama-cpp-python is not installed — using stub loader for '%s'",
                     model.name,
                 )
                 old_loader = self._loader
@@ -295,11 +325,15 @@ class ModelManager:
                 raise ModelError(self._load_error)
         else:
             old_loader = self._loader
+            mmproj = _find_mmproj_for(model)
+            if mmproj is not None:
+                logger.info("Vision projector detected for '%s': %s", model.name, mmproj.name)
             self._loader = GGUFModelLoader(
                 n_threads=self._n_threads,
                 n_gpu_layers=self._n_gpu_layers,
                 n_ctx=self._n_ctx,
                 auto_gpu_layers=self._auto_gpu_layers,
+                mmproj_path=mmproj,
             )
             try:
                 self._loader.load(model.path)

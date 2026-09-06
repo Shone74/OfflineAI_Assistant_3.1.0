@@ -1,7 +1,7 @@
-"""Reusable design komponente prema zvaničnom dizajnu.
+﻿"""Reusable design components per the official design.
 
-Sve komponente koriste objectName konvencije iz QSS builder-a
-(ui/design/qss.py) i ne sadrže inline hex vrednosti.
+All components use the objectName conventions from the QSS builder
+(ui/design/qss.py) and contain no inline hex values.
 """
 
 from __future__ import annotations
@@ -19,15 +19,15 @@ from PySide6.QtWidgets import (
 
 
 class Card(QFrame):
-    """Osnovna kartica (#card) — površina + border + radius iz teme."""
+    """Basic card (#card) — surface + border + radius from the theme."""
 
     def __init__(self, parent: QWidget | None = None, hoverable: bool = True) -> None:
         super().__init__(parent)
         self.setObjectName("card")
         if not hoverable:
-            # QFrame#card:hover pravilo se i dalje primenjuje; za ne-hover
-            # kartice koristimo card_title varijantu bez hovera je nemoguca
-            # cistim objectName-om, pa je hover prihvatljiv.
+            # The QFrame#card:hover rule still applies; for non-hover
+            # cards we would need a card_title variant without hover, which
+            # is impossible via objectName alone, so hover is acceptable.
             pass
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(14, 14, 14, 14)
@@ -45,7 +45,7 @@ class Card(QFrame):
 
 
 class Banner(QFrame):
-    """Status banner (success / warning / error) po wizard dizajnu."""
+    """Status banner (success / warning / error) per the wizard design."""
 
     def __init__(self, text: str = "", variant: str = "success",
                  parent: QWidget | None = None) -> None:
@@ -69,7 +69,7 @@ class Banner(QFrame):
 
 
 class Badge(QLabel):
-    """Mali emerald badge (npr. 'RECOMMENDED', '100% OFFLINE')."""
+    """Small emerald badge (e.g. 'RECOMMENDED', '100% OFFLINE')."""
 
     def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
         super().__init__(text, parent)
@@ -78,7 +78,7 @@ class Badge(QLabel):
 
 
 class StatusChip(QLabel):
-    """Status chip — emerald (ready) ili warning (limited) tekst."""
+    """Status chip — emerald (ready) or warning (limited) text."""
 
     def __init__(self, text: str = "", status: str = "ready",
                  parent: QWidget | None = None) -> None:
@@ -89,13 +89,13 @@ class StatusChip(QLabel):
 
     def apply_status(self, status: str) -> None:
         self._status = status
-        # Boje se ne hardcodiraju — citamo iz tokena preko palette objekta
+        # Colors are not hardcoded — we read them from tokens via the palette object
         from ui.design.tokens import get_palette
 
         p = get_palette("installer")
         color = p.warning if status == "warning" else p.error if status == "error" else p.emerald_text
         self.setStyleSheet(
-            f"color: {color}; font-size: 9px; font-weight: 600;"
+            f"color: {color}; font-size: 11px; font-weight: 600;"
             " letter-spacing: 0.4px; background: transparent;"
         )
 
@@ -105,7 +105,7 @@ class StatusChip(QLabel):
 
 
 class StorageBar(QProgressBar):
-    """Tanki progress bar za prikaz popunjenosti diska (#storage_bar)."""
+    """Thin progress bar for showing disk usage (#storage_bar)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -116,7 +116,7 @@ class StorageBar(QProgressBar):
 
 
 class InstallProgressBar(QProgressBar):
-    """Progress bar instalacije (#install_progress)."""
+    """Installation progress bar (#install_progress)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -127,7 +127,7 @@ class InstallProgressBar(QProgressBar):
 
 
 class CapabilityChip(QLabel):
-    """Chip za capability listu: '✓ TEXT' (aktivan) ili '✕ IMAGES' (neaktivan)."""
+    """Chip for the capability list: '✓ TEXT' (active) or '✕ IMAGES' (inactive)."""
 
     def __init__(self, label: str, active: bool = True,
                  parent: QWidget | None = None) -> None:
@@ -141,13 +141,13 @@ class CapabilityChip(QLabel):
         if active:
             self.setStyleSheet(
                 f"background: {p.tint(0.14)}; color: {p.emerald_text};"
-                " font-size: 9px; font-weight: 600; padding: 4px 8px;"
+                " font-size: 11px; font-weight: 600; padding: 4px 8px;"
                 " border-radius: 5px; letter-spacing: 0.3px;"
             )
         else:
             self.setStyleSheet(
                 f"background: rgba(89, 98, 95, 0.12); color: {p.text_muted};"
-                " font-size: 9px; font-weight: 600; padding: 4px 8px;"
+                " font-size: 11px; font-weight: 600; padding: 4px 8px;"
                 " border-radius: 5px; letter-spacing: 0.3px;"
             )
 
@@ -157,7 +157,7 @@ class CapabilityChip(QLabel):
 
 
 class StepIndicator(QWidget):
-    """Wizard sidebar step lista sa default/completed/current stanjima."""
+    """Wizard sidebar step list with default/completed/current states."""
 
     def __init__(self, steps: list[str], parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -169,7 +169,7 @@ class StepIndicator(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         for step in self._steps:
-            label = QLabel(f"✓  {step}" if False else step)
+            label = QLabel(step)
             label.setObjectName("wizard_step_default")
             label.setWordWrap(False)
             self._labels.append(label)
@@ -178,7 +178,7 @@ class StepIndicator(QWidget):
         self._refresh()
 
     def set_current(self, index: int) -> None:
-        """Postavi trenutni korak (0-based); prethodni postaju completed."""
+        """Set the current step (0-based); previous steps become completed."""
         if 0 <= index < len(self._steps):
             self._current = index
             self._refresh()
@@ -194,7 +194,7 @@ class StepIndicator(QWidget):
             else:
                 label.setObjectName("wizard_step_default")
                 label.setText(f"○  {self._steps[i]}")
-            # Forsira re-primenu QSS-a za novi objectName
+            # Force re-application of the QSS for the new objectName
             label.style().unpolish(label)
             label.style().polish(label)
 
@@ -204,7 +204,7 @@ class StepIndicator(QWidget):
 
 
 def make_section_title(text: str, parent: QWidget | None = None) -> QLabel:
-    """Sekcija naslov (#section_title) unutar stranice."""
+    """Section title (#section_title) within a page."""
     label = QLabel(text, parent)
     label.setObjectName("section_title")
     return label

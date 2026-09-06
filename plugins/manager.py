@@ -388,12 +388,12 @@ class PluginManager:
     # ------------------------------------------------------------------ #
     def list_summary(self) -> str:
         if not self._entries:
-            return "Nema plugina"
+            return "No plugins"
         lines = []
         for pid in sorted(self._entries):
             entry = self._entries[pid]
             lines.append(f"  {pid} — {entry.state.value} ({entry.metadata.name})")
-        return "Plugini:\n" + "\n".join(lines)
+        return "Plugins:\n" + "\n".join(lines)
 
     def handle_plugin_command(self, plugin_id: str, action: str, args: str) -> str:
         """Route a ``/plugin <id> <action> [args]`` invocation.
@@ -402,35 +402,35 @@ class PluginManager:
         any known command (so the caller can fall through to normal chat).
         """
         if not plugin_id:
-            return "Upotreba: /plugin <id> <enable|disable|info|komanda> [args]"
+            return "Usage: /plugin <id> <enable|disable|info|command> [args]"
 
         entry = self._entries.get(plugin_id)
         if entry is None:
-            return f"Plugin '{plugin_id}' nije pronađen"
+            return f"Plugin '{plugin_id}' not found"
 
         if action == "enable":
             if self.enable(plugin_id):
-                return f"Plugin '{plugin_id}' omogućen"
-            return f"Plugin '{plugin_id}' ne može biti omogućen (stanje: {entry.state.value})"
+                return f"Plugin '{plugin_id}' enabled"
+            return f"Plugin '{plugin_id}' cannot be enabled (state: {entry.state.value})"
         if action == "disable":
             if self.disable(plugin_id):
-                return f"Plugin '{plugin_id}' onemogućen"
-            return f"Plugin '{plugin_id}' ne može biti onemogućen (stanje: {entry.state.value})"
+                return f"Plugin '{plugin_id}' disabled"
+            return f"Plugin '{plugin_id}' cannot be disabled (state: {entry.state.value})"
 
         if action == "info":
             md = entry.metadata
             return (
                 f"Plugin: {md.name} ({plugin_id})\n"
-                f"  Verzija: {md.version}\n"
-                f"  Opis: {md.description or '—'}\n"
-                f"  Autor: {md.author or '—'}\n"
-                f"  Stanje: {entry.state.value}\n"
-                f"  Kategorije: {', '.join(md.categories) or '—'}\n"
-                f"  Dozvole: {', '.join(md.permissions) or '—'}"
+                f"  Version: {md.version}\n"
+                f"  Description: {md.description or '—'}\n"
+                f"  Author: {md.author or '—'}\n"
+                f"  State: {entry.state.value}\n"
+                f"  Categories: {', '.join(md.categories) or '—'}\n"
+                f"  Permissions: {', '.join(md.permissions) or '—'}"
             )
 
         if action and entry.state == PluginState.ENABLED:
             result = self._commands.handle(plugin_id, action, args)
             if result is not None:
                 return result
-        return f"Nepoznata komanda '{action}' za plugin '{plugin_id}'"
+        return f"Unknown command '{action}' for plugin '{plugin_id}'"

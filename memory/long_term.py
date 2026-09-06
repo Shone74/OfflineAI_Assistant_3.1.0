@@ -38,11 +38,11 @@ class LongTermMemory:
         cur = self._db.execute(
             "INSERT INTO conversations (title, summary, workspace_id, project_id, profile_snapshot, is_pinned, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
-            (title or "Nova razgovor", "", workspace_id, project_id, profile_json, 1 if pinned else 0),
+            (title or "New conversation", "", workspace_id, project_id, profile_json, 1 if pinned else 0),
         )
         return Conversation(
             id=cur.lastrowid,
-            title=title or "Nova razgovor",
+            title=title or "New conversation",
             summary="",
             workspace_id=workspace_id,
             project_id=project_id,
@@ -220,12 +220,12 @@ class LongTermMemory:
     def find_preference_memory(self, key: str) -> MemoryEntry | None:
         """Return the existing memory row for a preference *key*, if any.
 
-        Preferences are persisted as ``Korisnik preferira: {key} = {value}``
+        Preferences are persisted as ``User prefers: {key} = {value}``
         memory rows.  There should be at most one row per key; this lookup
         enables upsert semantics for ``set_preference`` without appending
         duplicates.
         """
-        prefix = f"Korisnik preferira: {key} = "
+        prefix = f"User prefers: {key} = "
         rows = self._db.query(
             "SELECT * FROM memories WHERE type = ?",
             ("user_preference",),

@@ -87,7 +87,7 @@ class AutomationManager:
     def run_workflow(self, name: str) -> str:
         workflow = self._workflows.get(name)
         if workflow is None:
-            return f"Nema workflow '{name}'. Dostupni: {', '.join(self.list_workflows()) or 'nema'}"
+            return f"No workflow '{name}'. Available: {', '.join(self.list_workflows()) or 'none'}"
         if not workflow.enabled:
             return f"Workflow '{name}' is disabled."
         results = workflow.run(self._registry)
@@ -100,7 +100,7 @@ class AutomationManager:
             "failed": len(results) - executed - blocked,
             "timestamp": datetime.now(UTC).isoformat(),
         })
-        return f"Workflow '{name}': {executed} uspeh, {blocked} blokirano, {len(results) - executed - blocked} neuspeh-a"
+        return f"Workflow '{name}': {executed} succeeded, {blocked} blocked, {len(results) - executed - blocked} failed"
 
     def run_scheduled(self, now: datetime | None = None) -> list[str]:
         """Execute all due tasks through the scheduler.

@@ -1,4 +1,4 @@
-"""Agents management page — list, add, edit, delete, enable/disable agents.
+﻿"""Agents management page — list, add, edit, delete, enable/disable agents.
 
 Replaces the static placeholder in :mod:`ui.main_window`.  Reads from the
 existing :class:`agent.repository.AgentRepository` (SQLite ``agents`` table)
@@ -70,6 +70,30 @@ class AgentsPage(QWidget):
         current_model = getattr(assistant, "model_name", None) or ""
         if current_model and current_model not in self._model_names:
             self._model_names.insert(0, current_model)
+
+        # Offer online models from every configured provider (agents opt in
+        # by picking "<provider>:<model>" as their model name).
+        try:
+            api_enabled = False
+            cfg = getattr(assistant, "config", None)
+            if cfg is not None:
+                api_enabled = bool(cfg.get("api.enabled", False))
+            if api_enabled:
+                from ai.engine.api_engine import (
+                    FREE_OPENROUTER_MODELS,
+                    PROVIDER_PRESETS,
+                    provider_is_configured,
+                )
+
+                for pid, meta in PROVIDER_PRESETS.items():
+                    if provider_is_configured(cfg, pid):
+                        self._model_names.append(f"{pid}:<model> — {meta['label']}")
+                if provider_is_configured(cfg, "openrouter"):
+                    self._model_names.extend(
+                        f"openrouter:{m}" for m in FREE_OPENROUTER_MODELS
+                    )
+        except Exception:
+            logger.debug("Could not extend model list with online models", exc_info=True)
 
         self._event_sub_ids: list[tuple[str, str]] = []
         self._cards: list[QFrame] = []
@@ -146,7 +170,7 @@ class AgentsPage(QWidget):
             "Local, configurable task executors. Each agent can have its own "
             "system prompt, model, tool whitelist and permissions."
         )
-        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 12px;")
+        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         desc.setWordWrap(True)
         desc.setMinimumWidth(300)
         header.addWidget(desc)
@@ -170,7 +194,7 @@ class AgentsPage(QWidget):
 
         # --- Banner ---
         self._banner = QLabel()
-        self._banner.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        self._banner.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         self._banner.setVisible(False)
         layout.addWidget(self._banner)
 
@@ -194,7 +218,7 @@ class AgentsPage(QWidget):
         # --- Footer ---
         footer = QHBoxLayout()
         self._count_label = QLabel("")
-        self._count_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        self._count_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         footer.addWidget(self._count_label)
         footer.addStretch()
         self._btn_refresh = QPushButton("Refresh")
@@ -217,14 +241,14 @@ class AgentsPage(QWidget):
     def _small_btn_css(self) -> str:
         return (
             f"QPushButton {{ padding: 2px 10px; border-radius: 5px; background: {_GRAPHITE_DARK_CARD};"
-            f" color: {_TEXT_SECONDARY}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 11px; }}"
+            f" color: {_TEXT_SECONDARY}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 13px; }}"
             f"QPushButton:hover {{ background: {_GRAPHITE_BORDER}; }}"
         )
 
     def _small_danger_btn_css(self) -> str:
         return (
             f"QPushButton {{ padding: 2px 10px; border-radius: 5px; background: {_GRAPHITE_DARK_CARD};"
-            f" color: {_DANGER}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 11px; }}"
+            f" color: {_DANGER}; border: 1px solid {_GRAPHITE_BORDER}; font-size: 13px; }}"
             f"QPushButton:hover {{ background: rgba(217,101,101,0.12); }}"
         )
 
@@ -333,7 +357,7 @@ class AgentsPage(QWidget):
 
         name_label = QLabel(agent.name or "unnamed")
         name_label.setStyleSheet(
-            f"color: {_TEXT_PRIMARY}; font-weight: 600; font-size: 13px;"
+            f"color: {_TEXT_PRIMARY}; font-weight: 600; font-size: 15px;"
         )
         top.addWidget(name_label)
 
@@ -344,14 +368,14 @@ class AgentsPage(QWidget):
             badge.setStyleSheet(
                 f"background: {_EMERALD_BG_TINT}; color: {_EMERALD_TEXT};"
                 f"border: 1px solid {_EMERALD_BORDER_TINT}; border-radius: 8px;"
-                f"padding: 2px 8px; font-size: 10px; font-weight: 600;"
+                f"padding: 2px 8px; font-size: 11px; font-weight: 600;"
             )
         else:
             badge = QLabel("DISABLED")
             badge.setStyleSheet(
                 f"background: rgba(217,101,101,0.10); color: {_DANGER};"
                 f"border: 1px solid rgba(217,101,101,0.3); border-radius: 8px;"
-                f"padding: 2px 8px; font-size: 10px; font-weight: 600;"
+                f"padding: 2px 8px; font-size: 11px; font-weight: 600;"
             )
         top.addWidget(badge)
 
@@ -375,7 +399,7 @@ class AgentsPage(QWidget):
         # --- Description ---
         if agent.description:
             desc = QLabel(agent.description)
-            desc.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 12px;")
+            desc.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px;")
             desc.setWordWrap(True)
             layout.addWidget(desc)
 
@@ -394,14 +418,14 @@ class AgentsPage(QWidget):
         else:
             whitelist_text = "All tools allowed"
         wl = QLabel(f"Tools: {whitelist_text}")
-        wl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        wl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         wl.setWordWrap(True)
         layout.addWidget(wl)
 
         # --- Updated timestamp ---
         updated = agent.updated_at if agent.updated_at else "—"
         date_label = QLabel(f"Modified: {updated}")
-        date_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        date_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         layout.addWidget(date_label)
 
         # --- Action buttons ---

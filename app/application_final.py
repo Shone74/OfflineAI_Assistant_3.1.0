@@ -38,9 +38,9 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
     automation_manager = manager._automation
 
     chat = ChatWidget()
-    # Chat + Voice + Assistant povezivanje (Faza 7): send/voice signali i
-    # VOICE_* eventi imaju konzumenta unutar AppShell-a; Automatic Listening
-    # toggle radi kroz koordinatora.
+    # Chat + Voice + Assistant wiring (Phase 7): send/voice signals and
+    # VOICE_* events have a consumer inside the AppShell; the Automatic
+    # Listening toggle works through the coordinator.
     coordinator = ChatVoiceCoordinator(
         chat=chat,
         assistant=assistant,
@@ -87,8 +87,8 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
 
 def main() -> int:
     manager = ApplicationManager()
-    # Ne prikazuj legacy MainWindow — AppShell (ispod) je primarni prozor.
-    # Ako je first-run, wizard/welcome dijalog i dalje se prikazuje unutar start().
+    # Do not show the legacy MainWindow — the AppShell (below) is the primary window.
+    # On first run, the wizard/welcome dialog is still shown inside start().
     exit_code = manager.start(show_main_window=False)
     if exit_code != 0:
         return exit_code

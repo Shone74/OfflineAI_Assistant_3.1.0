@@ -1,4 +1,4 @@
-"""Capabilities page — shows what the assistant and model can do."""
+﻿"""Capabilities page — shows what the assistant and model can do."""
 
 from __future__ import annotations
 
@@ -33,7 +33,6 @@ _CAPABILITY_MAP: list[tuple[str, str, str]] = [
     ("Text Generation", "text_generation", "Generate human-quality text responses"),
     ("Streaming", "streaming", "Real-time token streaming"),
     ("Code Generation", "code_generation", "Write and understand code"),
-    ("Document Processing", "function_calling", "Use external tools and plugins"),
     ("Tool Calling", "tool_calling", "Use external tools and plugins"),
     ("Function Calling", "function_calling", "Structured function/tool invocation"),
     ("Reasoning", "reasoning", "Step-by-step logical reasoning"),
@@ -56,7 +55,26 @@ class CapabilitiesPage(QWidget):
         self._model_status_label: QLabel | None = None
         self._no_model_label: QLabel | None = None
         self._caps_container: QFrame | None = None
+        self._event_sub_ids: list[tuple[str, str]] = []
         self._build_ui()
+        self._subscribe_model_events()
+
+    def _subscribe_model_events(self) -> None:
+        """Auto-refresh when the active model changes (MODEL_LOADED / UNLOADED)."""
+        if self._assistant is None:
+            return
+        bus = getattr(self._assistant, "event_bus", None)
+        if bus is None:
+            return
+        for event_type in ("MODEL_LOADED", "MODEL_UNLOADED", "MODEL_LOAD_FAILED"):
+            try:
+                sub_id = bus.subscribe(event_type, self._on_model_event)
+                self._event_sub_ids.append((event_type, sub_id))
+            except Exception:
+                pass
+
+    def _on_model_event(self, event_type: str, data: dict) -> None:
+        self._refresh_capabilities()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -72,12 +90,12 @@ class CapabilitiesPage(QWidget):
         header.addStretch()
 
         self._model_name_label = QLabel("Model: N/A")
-        self._model_name_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px;")
+        self._model_name_label.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 15px;")
         header.addWidget(self._model_name_label)
         layout.addLayout(header)
 
         self._model_status_label = QLabel("Status: No model loaded")
-        self._model_status_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 12px;")
+        self._model_status_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         layout.addWidget(self._model_status_label)
 
         scroll = QScrollArea()
@@ -96,7 +114,7 @@ class CapabilitiesPage(QWidget):
 
         self._no_model_label = QLabel("No model is currently loaded.")
         self._no_model_label.setStyleSheet(
-            f"color: {_TEXT_SECONDARY}; font-size: 14px; padding-top: 20px;"
+            f"color: {_TEXT_SECONDARY}; font-size: 15px; padding-top: 20px;"
         )
         self._no_model_label.hide()
         content_layout.addWidget(self._no_model_label)
@@ -133,9 +151,9 @@ class CapabilitiesPage(QWidget):
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
         title = QLabel(name)
-        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 14px; font-weight: 600;")
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 15px; font-weight: 600;")
         desc_label = QLabel(desc)
-        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
+        desc_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 13px;")
         desc_label.setWordWrap(True)
         text_layout.addWidget(title)
         text_layout.addWidget(desc_label)
@@ -144,7 +162,7 @@ class CapabilitiesPage(QWidget):
         status = QLabel("Active" if enabled else "Inactive")
         status.setStyleSheet(
             f"color: {_EMERGENCY_HOVER if enabled else _TEXT_MUTED};"
-            f" font-size: 11px; font-weight: 600;"
+            f" font-size: 13px; font-weight: 600;"
         )
         layout.addWidget(status)
 
@@ -185,9 +203,9 @@ class CapabilitiesPage(QWidget):
                     item.widget().setParent(None)
 
         if caps_dict is None:
+            hint = "Load a model on the Models page to see its capabilities."
             self._no_model_label.setText(
-                f"No model is currently loaded.\n\n"
-                f"Loaded Model: {model_name}"
+                f"No model is currently loaded.\n{hint}\n\nLoaded Model: {model_name}"
             )
             self._no_model_label.show()
             return

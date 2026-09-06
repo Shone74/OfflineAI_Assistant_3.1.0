@@ -107,6 +107,20 @@ class LLMEngine(ABC):
         caps = self.model_capabilities
         return caps.tool_calling or caps.function_calling
 
+    @property
+    def supports_vision(self) -> bool:
+        """True if the active model can process images.
+
+        Requires BOTH a vision-capable model AND an attached vision
+        projector (mmproj) — a bare vision model without its clip
+        projector cannot understand images.
+        """
+        caps = self.model_capabilities
+        if not (caps.vision or caps.multimodal):
+            return False
+        loader = getattr(self, "_loader", None)
+        return bool(getattr(loader, "vision_enabled", False))
+
     def generate_with_tools(
         self,
         prompt: str,
@@ -261,8 +275,13 @@ class LlamaCppEngine(LLMEngine):
                 "Install llama-cpp-python and load a GGUF model."
             )
         cfg = config or GenerationConfig()
+        # Multimodal: user messages may carry image data as a list of
+        # base64 strings under the "images" key.  llama.cpp's chat
+        # completions API accepts {"type": "image_url", "image_url": {...}}
+        # content parts (converted below) via the clip chat handler.
+        vision_messages = _extract_vision_messages(messages)
         yield from self._loader.generate_chat_stream(
-            messages,
+            vision_messages if vision_images_present(messages) else messages,
             max_tokens=cfg.max_tokens,
             temperature=cfg.temperature,
             top_p=cfg.top_p,
@@ -277,10 +296,17 @@ class LlamaCppEngine(LLMEngine):
 
         Uses the model's tokenizer to count tokens exactly. This is used for
         prompt truncation to ensure we stay within the model's context window.
+        Images (base64 payloads) are excluded from the count — their token
+        cost depends on the vision projector and is reserved separately.
         """
         if self._loader is None:
             raise ModelError("Engine not configured — call configure() first")
-        return self._loader.count_tokens(messages)
+        text_only: list[dict[str, str]] = []
+        for m in messages:
+            text_only.append(
+                {"role": m.get("role", "user"), "content": _content_text(m.get("content", ""))}
+            )
+        return self._loader.count_tokens(text_only)
 
     @property
     def model_name(self) -> str:
@@ -363,7 +389,7 @@ class StubEngine(LLMEngine):
 
     def generate(self, prompt: str, config: GenerationConfig | None = None) -> str:
         return (
-            "Ovo je placeholder odgovor. Nema povezanog AI modela. "
+            "This is a placeholder response. No AI model is attached. "
             "(StubEngine)"
         )
 
@@ -452,6 +478,71 @@ def _messages_to_transcript(
         elif role == "assistant":
             history.append({"role": "assistant", "content": content})
     return system_prompt, history, user_input
+
+
+def _content_text(content: Any) -> str:
+    """Extract plain text from a message content (str or content-parts list)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict):
+                if isinstance(part.get("text"), str):
+                    parts.append(part["text"])
+                elif isinstance(part.get("content"), str):
+                    parts.append(part["content"])
+            elif isinstance(part, str):
+                parts.append(part)
+        return " ".join(parts)
+    return str(content or "")
+
+
+def vision_images_present(messages: list[dict[str, Any]]) -> bool:
+    """True when any user message carries image data ("images" key)."""
+    return any(
+        isinstance(m.get("images"), (list, tuple)) and m.get("images")
+        for m in messages
+        if m.get("role") == "user"
+    )
+
+
+def _extract_vision_messages(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Convert "images" (base64 list) into llama.cpp multimodal content parts.
+
+    llama.cpp chat completions accept ``image_url`` content parts whose
+    ``url`` is a ``data:image/...;base64,<data>`` URI; the clip chat
+    handler decodes and embeds them.  Plain-text messages pass through
+    unchanged.
+    """
+    converted: list[dict[str, Any]] = []
+    for msg in messages:
+        images = msg.get("images")
+        if msg.get("role") == "user" and isinstance(images, (list, tuple)) and images:
+            text = _content_text(msg.get("content", ""))
+            content_parts: list[dict[str, Any]] = [
+                {"type": "text", "text": text or "Describe this image."}
+            ]
+            for img in images:
+                data = str(img)
+                if data.startswith("data:"):
+                    uri = data
+                else:
+                    uri = f"data:image/png;base64,{data}"
+                content_parts.append(
+                    {"type": "image_url", "image_url": {"url": uri}}
+                )
+            converted.append({"role": "user", "content": content_parts})
+        else:
+            converted.append(
+                {
+                    "role": msg.get("role", "user"),
+                    "content": _content_text(msg.get("content", "")),
+                }
+            )
+    return converted
 
 
 DEFAULT_SYSTEM_PROMPT = SYSTEM_PROMPT

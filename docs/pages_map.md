@@ -1,43 +1,43 @@
-# Mapa stranica — AppShell rute (Faza 4, korak 4.1)
+# Page Map — AppShell Routes (Phase 4, step 4.1)
 
-**Izvor:** `app/application_final.py` (`_build_pages`) + `ui/main_window.py` (legacy).
-**Pravilo:** nijedna funkcionalna stranica se ne gubi — sve imaju rutu u AppShell-u.
+**Source:** `app/application_final.py` (`_build_pages`) + `ui/main_window.py` (legacy).
+**Rule:** no functional page is lost — all of them have a route in AppShell.
 
-## Aktivne rute u AppShell-u (13 + Home)
+## Active routes in AppShell (13 + Home)
 
-| Ruta | Widget | Sidebar sekcija | Legacy ekvivalent (MainWindow) | Funkcija |
+| Route | Widget | Sidebar section | Legacy equivalent (MainWindow) | Function |
 |---|---|---|---|---|
-| Home | `HomePage` | Primarna | — (nova) | Status hub, hero, quick actions |
-| Assistant Hub | `AssistantHub` | — (samo navigator) | AssistantHub | Profil asistenta |
-| Chat | `ChatWidget` | Primarna 💬 | ChatWidget + ConversationSidebar | Chat sa streamingom |
-| Memory | `MemoryPage` | Primarna 🧠 | MemoryPage | Pregled/dodavanje sećanja |
-| Knowledge | `KnowledgeDashboard` | Primarna 📚 | KnowledgeDashboard | Izvori znanja, RAG |
-| Models | `ModelsPage` | ADVANCED 📦 | ModelsPage | Otkrivanje/aktivacija modela |
-| Capabilities | `CapabilitiesPage` | Primarna 🧩 | CapabilitiesPage | Capability flagovi modela |
-| Projects | `ProjectsPage` | Primarna 🗂 | ProjectsPage | Projekti/workspace-i |
-| Agents | `AgentsPage` | ADVANCED 🤖 | AgentsPage | Kreiranje/putnja agenata |
-| Tools | `ToolsPage` | ADVANCED 🔧 | ToolsPage | Registry alata, permissions |
-| Voice | `VoicePage` | ADVANCED 🎤 | VoicePage | STT/TTS konfiguracija |
-| Automation | `AutomationDashboard` | ADVANCED ⚡ | AutomationDashboard | Workflow-i, scheduler |
+| Home | `HomePage` | Primary | — (new) | Status hub, hero, quick actions |
+| Assistant Hub | `AssistantHub` | — (navigator only) | AssistantHub | Assistant profile |
+| Chat | `ChatWidget` | Primary 💬 | ChatWidget + ConversationSidebar | Chat with streaming |
+| Memory | `MemoryPage` | Primary 🧠 | MemoryPage | Memory overview/addition |
+| Knowledge | `KnowledgeDashboard` | Primary 📚 | KnowledgeDashboard | Knowledge sources, RAG |
+| Models | `ModelsPage` | ADVANCED 📦 | ModelsPage | Model discovery/activation |
+| Capabilities | `CapabilitiesPage` | Primary 🧩 | CapabilitiesPage | Model capability flags |
+| Projects | `ProjectsPage` | Primary 🗂 | ProjectsPage | Projects/workspaces |
+| Agents | `AgentsPage` | ADVANCED 🤖 | AgentsPage | Creating/managing agents |
+| Tools | `ToolsPage` | ADVANCED 🔧 | ToolsPage | Tool registry, permissions |
+| Voice | `VoicePage` | ADVANCED 🎤 | VoicePage | STT/TTS configuration |
+| Automation | `AutomationDashboard` | ADVANCED ⚡ | AutomationDashboard | Workflows, scheduler |
 | Workflow | `WorkflowBuilder` | ADVANCED 🧪 | WorkflowBuilder | Workflow builder |
-| Settings | `SettingsDialog` (dialog) | ⚙ dugme | SettingsDialog | Sve postavke |
+| Settings | `SettingsDialog` (dialog) | ⚙ button | SettingsDialog | All settings |
 
-## Sidebar grupisanje (iz app_shell.py)
+## Sidebar grouping (from app_shell.py)
 
-- **Primarna:** Home, Chat, Memory, Knowledge, Capabilities, Projects
+- **Primary:** Home, Chat, Memory, Knowledge, Capabilities, Projects
 - **ADVANCED:** Models, Agents, Tools, Voice, Automation, Workflow
-- **Dno:** 👤 My Profile (→ Settings), ⚙ Settings
+- **Bottom:** 👤 My Profile (→ Settings), ⚙ Settings
 
-## Odluke
+## Decisions
 
-- `SettingsDialog` ostaje dialog (po legacy dizajnu) — ⚙ u topbaru i sidebaru ga otvara kroz rutu "Settings" ako je u page listi (trenutno NIJE widget page — otvara se iz Menija). **TODO 4.9:** dodati Settings kao pravu stranicu.
-- `main_original.py --test-runtime` ne dira UI (runtime acceptance test) — van mape.
+- `SettingsDialog` remains a dialog (per the legacy design) — ⚙ in the topbar and sidebar opens it via the "Settings" route if it is in the page list (currently NOT a widget page — it opens from the Menu). **TODO 4.9:** add Settings as a proper page.
+- `main_original.py --test-runtime` does not touch the UI (runtime acceptance test) — outside the map.
 
-## Status migracije (ažurira se kroz Fazom 4)
+## Migration status (updated throughout Phase 4)
 
-| Korak | Stranica | Stil po dizajnu | Funkcionalno u shell-u | Test |
+| Step | Page | Design-compliant style | Functional in the shell | Test |
 |---|---|---|---|---|
-| 4.2 | Chat | ⬜ | ✅ (radi iz Faze 1) | ⬜ |
+| 4.2 | Chat | ⬜ | ✅ (works from Phase 1) | ⬜ |
 | 4.3 | Memory | ⬜ | ✅ | ⬜ |
 | 4.4 | Knowledge | ⬜ | ✅ | ⬜ |
 | 4.5 | Models | ⬜ | ✅ | ⬜ |
@@ -45,5 +45,5 @@
 | 4.7 | Projects | ⬜ | ✅ | ⬜ |
 | 4.8 | Agents/Tools/Automation/Workflow | ⬜ | ✅ | ⬜ |
 | 4.8b | Voice | ⬜ | ✅ | ⬜ |
-| 4.9 | Settings | ⬜ | ⚠️ dialog, ne stranica | ⬜ |
-| 4.10 | SysTray/QThread | ➖ | ✅ (worker iz start()) | ⬜ |
+| 4.9 | Settings | ⬜ | ⚠️ dialog, not a page | ⬜ |
+| 4.10 | SysTray/QThread | ➖ | ✅ (worker from start()) | ⬜ |

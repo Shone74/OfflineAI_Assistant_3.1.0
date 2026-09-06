@@ -1,4 +1,4 @@
-"""Projects page — full CRUD UI for project management with runtime state display.
+﻿"""Projects page — full CRUD UI for project management with runtime state display.
 
 Implements the Sidebar "Projects" feature as a real, usable application feature:
 
@@ -57,7 +57,7 @@ _TEXT_SECONDARY = _PALETTE.text_secondary
 _TEXT_MUTED = _PALETTE.text_muted
 _RED = _PALETTE.error
 _ORANGE = _PALETTE.warning
-_BLUE = "#4A90D9"  # info akcenat (van zvanične palete; jedini izuzetak)
+_BLUE = "#4A90D9"  # info akcenat (van zvaniÄne palete; jedini izuzetak)
 
 
 class ProjectsPage(QWidget):
@@ -150,7 +150,7 @@ class ProjectsPage(QWidget):
         header = QHBoxLayout()
 
         title = QLabel("Projects")
-        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 14px; font-weight: 600;")
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 15px; font-weight: 600;")
         header.addWidget(title)
 
         header.addStretch()
@@ -201,7 +201,7 @@ class ProjectsPage(QWidget):
         detail_layout.setSpacing(14)
 
         self._detail_title = QLabel("No project selected")
-        self._detail_title.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
+        self._detail_title.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 15px; font-weight: 600;")
         detail_layout.addWidget(self._detail_title)
 
         self._detail_content = QFrame()
@@ -280,7 +280,7 @@ class ProjectsPage(QWidget):
         layout.setSpacing(6)
 
         name_label = QLabel(proj.name or "Untitled")
-        name_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 11px; font-weight: 600;")
+        name_label.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 13px; font-weight: 600;")
         label_layout = QHBoxLayout()
         label_layout.addWidget(name_label)
         label_layout.addStretch()
@@ -291,13 +291,13 @@ class ProjectsPage(QWidget):
         layout.addLayout(label_layout)
 
         desc = QLabel(proj.description or "No description")
-        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px; line-height: 1.4;")
+        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; line-height: 1.4;")
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
         if proj.workspace_path:
             path_label = QLabel(proj.workspace_path)
-            path_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px; line-height: 1.2;")
+            path_label.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; line-height: 1.2;")
             path_label.setToolTip(proj.workspace_path)
             layout.addWidget(path_label)
 
@@ -314,14 +314,14 @@ class ProjectsPage(QWidget):
 
         if self._selected_project is None:
             self._detail_title.setText("No project selected")
-            self._detail_title.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 13px; font-weight: 600;")
+            self._detail_title.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 15px; font-weight: 600;")
             self._clear_detail_content()
             self._hide_detail_buttons()
             return
 
         proj = self._selected_project
         self._detail_title.setText(proj.name or "Untitled")
-        self._detail_title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 14px; font-weight: 600;")
+        self._detail_title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 15px; font-weight: 600;")
 
         self._clear_detail_content()
         detail_layout = self._detail_content_layout
@@ -363,9 +363,9 @@ class ProjectsPage(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(4)
         lbl = QLabel(label)
-        lbl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+        lbl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
         val = QLabel(str(value))
-        val.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px;")
+        val.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
         val.setWordWrap(True)
         row.addWidget(lbl)
         row.addWidget(val, stretch=1)
@@ -407,7 +407,7 @@ class ProjectsPage(QWidget):
             color = _RED
         else:
             color = _TEXT_MUTED
-        return f"color: {color}; font-size: 8px; font-weight: 600;"
+        return f"color: {color}; font-size: 10px; font-weight: 600;"
 
     def _build_files_section(self, proj: Any) -> QFrame:
         section = QFrame()
@@ -416,18 +416,18 @@ class ProjectsPage(QWidget):
         layout.setSpacing(6)
 
         header = QLabel("Project Files")
-        header.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px; font-weight: 600;")
+        header.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px; font-weight: 600;")
         layout.addWidget(header)
 
         if not proj.workspace_path:
             no_path = QLabel("No workspace path set")
-            no_path.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+            no_path.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
             layout.addWidget(no_path)
         else:
             files = self._list_workspace_files(proj)
             if not files:
                 no_files = QLabel("No files found in workspace")
-                no_files.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px;")
+                no_files.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px;")
                 layout.addWidget(no_files)
             else:
                 list_widget = QFrame()
@@ -436,13 +436,13 @@ class ProjectsPage(QWidget):
                 file_layout.setSpacing(2)
                 for f in files[:50]:
                     fl = QLabel(f)
-                    fl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 8px;")
+                    fl.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px;")
                     fl.setToolTip(f)
                     file_layout.addWidget(fl)
                 layout.addWidget(list_widget)
                 if len(files) > 50:
                     more = QLabel(f"... and {len(files) - 50} more")
-                    more.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 8px;")
+                    more.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px;")
                     layout.addWidget(more)
 
         return section
@@ -463,7 +463,7 @@ class ProjectsPage(QWidget):
         layout.setSpacing(6)
 
         header = QLabel("Agent")
-        header.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 10px; font-weight: 600;")
+        header.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px; font-weight: 600;")
         layout.addWidget(header)
 
         ctx = None
@@ -472,7 +472,7 @@ class ProjectsPage(QWidget):
 
         if ctx is None or ctx.agent_assignment is None:
             info = QLabel("No agent assigned. Assign an agent to run automated tasks.")
-            info.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 9px; line-height: 1.4;")
+            info.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 11px; line-height: 1.4;")
             info.setWordWrap(True)
             layout.addWidget(info)
         else:
@@ -496,13 +496,13 @@ class ProjectsPage(QWidget):
                 color = _TEXT_MUTED
 
             info = QLabel(f"<b>{agent_name}</b><br>Status: <span style='color:{color}'>{state_display}</span>")
-            info.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 9px;")
+            info.setStyleSheet(f"color: {_TEXT_SECONDARY}; font-size: 11px;")
             info.setTextFormat(Qt.TextFormat.RichText)
             layout.addWidget(info)
 
             if ctx.agent_assignment.last_task:
                 task = QLabel(f"Last task: {ctx.agent_assignment.last_task}")
-                task.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 8px;")
+                task.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px;")
                 task.setWordWrap(True)
                 layout.addWidget(task)
 
@@ -554,7 +554,7 @@ class ProjectsPage(QWidget):
         layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignCenter)
 
         title = QLabel("No projects")
-        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 11px; font-weight: 600;")
+        title.setStyleSheet(f"color: {_TEXT_PRIMARY}; font-size: 13px; font-weight: 600;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
@@ -562,7 +562,7 @@ class ProjectsPage(QWidget):
             "Create a project to get started.<br>"
             "Projects let you organize conversations and files around a workspace."
         )
-        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 8px; line-height: 1.5;")
+        desc.setStyleSheet(f"color: {_TEXT_MUTED}; font-size: 10px; line-height: 1.5;")
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(desc)
@@ -759,7 +759,7 @@ class ProjectsPage(QWidget):
             bg = _GRAPHITE_BORDER
         return (
             f"background: {bg}; color: {_TEXT_PRIMARY};"
-            f" border: none; border-radius: 4px; font-size: 9px; font-weight: 600;"
+            f" border: none; border-radius: 4px; font-size: 11px; font-weight: 600;"
             f" padding: 4px 8px;"
         )
 
@@ -876,14 +876,14 @@ class CreateProjectDialog(QDialog):
         return (
             f"background: {_GRAPHITE}; color: {_TEXT_PRIMARY};"
             f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px;"
-            f" padding: 4px 6px; font-size: 9px;"
+            f" padding: 4px 6px; font-size: 11px;"
         )
 
     def _button_style(self, highlight: bool = False) -> str:
         bg = _EMERGENCY_HOVER if highlight else _GRAPHITE_BORDER
         return (
             f"background: {bg}; color: {_TEXT_PRIMARY};"
-            f" border: none; border-radius: 4px; font-size: 9px; font-weight: 600;"
+            f" border: none; border-radius: 4px; font-size: 11px; font-weight: 600;"
             f" padding: 4px 8px;"
         )
 
@@ -991,13 +991,13 @@ class EditProjectDialog(QDialog):
         return (
             f"background: {_GRAPHITE}; color: {_TEXT_PRIMARY};"
             f" border: 1px solid {_GRAPHITE_BORDER}; border-radius: 4px;"
-            f" padding: 4px 6px; font-size: 9px;"
+            f" padding: 4px 6px; font-size: 11px;"
         )
 
     def _button_style(self, highlight: bool = False) -> str:
         bg = _EMERGENCY_HOVER if highlight else _GRAPHITE_BORDER
         return (
             f"background: {bg}; color: {_TEXT_PRIMARY};"
-            f" border: none; border-radius: 4px; font-size: 9px; font-weight: 600;"
+            f" border: none; border-radius: 4px; font-size: 11px; font-weight: 600;"
             f" padding: 4px 8px;"
         )
