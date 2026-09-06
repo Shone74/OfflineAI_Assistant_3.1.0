@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from knowledge.models import Document
+from ui.design.components import Banner
 
 
 class KnowledgeDashboard(QWidget):
@@ -26,15 +27,33 @@ class KnowledgeDashboard(QWidget):
     delete_requested = Signal(str)
     rebuild_requested = Signal(str)
 
-    def __init__(self, parent: QWidget | None = None, navigator=None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        navigator=None,
+        assistant: Any = None,
+    ) -> None:
         super().__init__(parent)
         self._navigator = navigator
+        self._assistant = assistant
         self._documents: dict[str, Document] = {}
         self._stats: dict[str, Any] = {}
         self._setup_ui()
+        self.refresh_embedding_status()
 
     def _setup_ui(self) -> None:
-        layout = QHBoxLayout(self)
+        root = QVBoxLayout(self)
+
+        self._embedding_warning = Banner(
+            "Semantic search is limited: using stub embeddings (no real semantic "
+            "model). Results may not be meaningful. Install a real embedding "
+            "model for better search.",
+            variant="warning",
+        )
+        self._embedding_warning.setVisible(False)
+        root.addWidget(self._embedding_warning)
+
+        layout = QHBoxLayout()
 
         top_left = QVBoxLayout()
         self._search_input = QLineEdit()
@@ -92,6 +111,27 @@ class KnowledgeDashboard(QWidget):
         right.addWidget(self._stats_box)
 
         layout.addLayout(right, stretch=2)
+        root.addLayout(layout)
+
+    def refresh_embedding_status(self) -> None:
+        """Show a warning banner when the embedding backend is a stub.
+
+        Stub embeddings have no real semantics, so semantic search quality
+        is degraded.  Never raises: the dashboard works without an assistant.
+        """
+        try:
+            memory = getattr(self._assistant, "memory", None)
+            if memory is None:
+                memory = getattr(self._assistant, "_memory", None)
+            info = (
+                memory.get_embedding_model_info()
+                if memory is not None
+                else None
+            )
+            is_stub = bool(info.get("is_stub")) if info else False
+        except Exception:
+            is_stub = False
+        self._embedding_warning.setVisible(is_stub)
 
     def _on_search_requested(self) -> None:
         query = self._search_input.text().strip()

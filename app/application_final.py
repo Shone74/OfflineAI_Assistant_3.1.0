@@ -50,7 +50,7 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
     coordinator.wire()
     manager._chat_coordinator = coordinator
     memory = MemoryPage(assistant=assistant)
-    knowledge = KnowledgeDashboard(navigator=navigator)
+    knowledge = KnowledgeDashboard(navigator=navigator, assistant=assistant)
     models = ModelsPage(assistant=assistant, model_manager=manager._model_manager, event_bus=event_bus)
     capabilities = CapabilitiesPage(assistant=assistant)
     projects = ProjectsPage(assistant=assistant)
