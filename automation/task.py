@@ -61,6 +61,12 @@ class AutomationTask:
     def schedule_next(self, now: datetime) -> None:
         if self.schedule == ScheduleType.ONCE:
             self.next_run = None
+            # A successfully completed one-shot must never auto-run again.
+            # Keep status=SUCCESS (do NOT call disable() — it would overwrite
+            # the SUCCESS status with DISABLED) and keep run_at intact for
+            # display purposes; only the enabled flag flips to False.
+            if self.status == TaskStatus.SUCCESS:
+                self.enabled = False
         elif self.schedule == ScheduleType.INTERVAL:
             self.next_run = now + timedelta(seconds=self.interval_seconds)
         else:
