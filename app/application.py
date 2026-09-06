@@ -140,6 +140,7 @@ class ApplicationManager:
         self._planner: Planner | None = None
         self._orchestrator: AgentOrchestrator | None = None
         self._automation: AutomationManager | None = None
+        self._automation_dispatcher: Any | None = None
         self._scheduler_timer: QTimer | None = None
         self._db_manager: DatabaseManager | None = None
         self._workspace_manager: WorkspaceManager | None = None
@@ -401,6 +402,16 @@ class ApplicationManager:
 
             logger.info("Automation manager ready (system_check workflow + scheduler)")
 
+            # Off-GUI-thread task execution: the QTimer tick stays on the GUI
+            # thread (cheap due-evaluation), while each due task's actual
+            # execution runs on an AutomationTaskWorker.  Completion returns
+            # to the GUI thread via a queued signal; all state mutation and
+            # EventBus publication stay on the GUI thread.
+            from automation.worker import AutomationDispatcher
+
+            self._automation_dispatcher = AutomationDispatcher(
+                self._automation, event_bus=self._event_bus
+            )
             self._scheduler_timer = QTimer()
             self._scheduler_timer.timeout.connect(self._tick_automation)
             logger.info("Automation scheduler created (start deferred until MainWindow ready)")
@@ -594,6 +605,18 @@ class ApplicationManager:
             except Exception:
                 logger.warning("Failed to persist knowledge")
 
+        # Stop the automation dispatcher and wait (bounded) for any running
+        # task workers BEFORE persisting tasks — otherwise a task finishing
+        # after save_tasks() would lose its final state, and a still-running
+        # worker would outlive the application (zombie QThread).
+        dispatcher = getattr(self, "_automation_dispatcher", None)
+        self._automation_dispatcher = None
+        if dispatcher is not None:
+            try:
+                dispatcher.shutdown()
+            except Exception:
+                logger.warning("Automation dispatcher shutdown failed", exc_info=True)
+
         # Save workflow persistence before shutdown
         if self._automation is not None and self._config is not None:
             try:
@@ -647,7 +670,19 @@ class ApplicationManager:
         logger.info("Application stopped")
 
     def _tick_automation(self) -> None:
-        """Timer callback: tick the automation scheduler (runs on Qt main thread)."""
+        """Timer callback: due-evaluate on the GUI thread (runs on Qt main thread).
+
+        The due scan is a cheap ``is_due`` check; the actual task execution is
+        submitted to worker threads by the dispatcher, so this callback never
+        blocks the GUI on tool/workflow work.
+        """
+        dispatcher = getattr(self, "_automation_dispatcher", None)
+        if dispatcher is not None:
+            try:
+                dispatcher.tick()
+                return
+            except Exception:
+                logger.exception("Automation dispatcher tick failed")
         if self._automation is not None:
             try:
                 self._automation.tick()

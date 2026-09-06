@@ -103,11 +103,16 @@ class AutomationManager:
         return f"Workflow '{name}': {executed} succeeded, {blocked} blocked, {len(results) - executed - blocked} failed"
 
     def run_scheduled(self, now: datetime | None = None) -> list[str]:
-        """Execute all due tasks through the scheduler.
+        """Execute all due tasks through the scheduler (synchronous).
 
         Workflow-targeted tasks are dispatched to ``run_workflow`` so they
         reuse the existing secured execution path.  Tool-targeted tasks use
         the scheduler's default ``execute`` (direct ``ToolRegistry.execute``).
+
+        This is the original synchronous API, kept for tests and
+        non-Qt callers.  The application runtime (GUI) uses
+        :meth:`run_scheduled_dispatch` instead so that task execution does
+        not block the GUI thread.
         """
         def _execute(task: AutomationTask, registry: ToolRegistry):
             if task.target_type == "workflow":
@@ -116,6 +121,33 @@ class AutomationManager:
 
         outcomes = self._scheduler.tick(self._registry, now, execute_fn=_execute)
         return [f"{t.name}: {outcome}" for t, outcome in outcomes]
+
+    @property
+    def tool_registry(self) -> ToolRegistry:
+        """The secured registry every task execution goes through."""
+        return self._registry
+
+    def run_scheduled_dispatch(self, dispatcher: Any, now: datetime | None = None) -> None:
+        """Due-evaluate synchronously and submit due tasks to *dispatcher*.
+
+        GUI-runtime counterpart of :meth:`run_scheduled`: due evaluation is a
+        cheap ``is_due`` scan performed on the calling (GUI) thread, while
+        the actual task execution is submitted to the dispatcher's worker
+        threads (see :class:`~automation.worker.AutomationDispatcher`).
+        Task state finalization happens back on the GUI thread when each
+        worker reports completion.
+        """
+        due_tasks = self._scheduler.due(now)
+        for task in due_tasks:
+            if dispatcher.is_in_flight(task.name):
+                continue
+            dispatcher.submit(task, self._dispatch_execute, now)
+
+    def _dispatch_execute(self, task: AutomationTask, registry: ToolRegistry):
+        """Worker-thread execution used by the dispatcher (same secured path)."""
+        if task.target_type == "workflow":
+            return self._execute_workflow_task(task, registry)
+        return self._scheduler.execute(task, registry)
 
     def _execute_workflow_task(self, task: AutomationTask, registry: ToolRegistry):
         """Execute a workflow-targeted task through the secured registry.
