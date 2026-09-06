@@ -6,9 +6,9 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from PySide6.QtCore import Q_ARG, QMetaObject, Qt, QThread, Signal, Slot
+from PySide6.QtCore import Q_ARG, QEventLoop, QMetaObject, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -503,19 +503,21 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()
 
     def _start_generation(self, text: str, images: list | None = None) -> str:
-        """Run process_message with per-generation cancel event and pulse callback.
+        """Run process_message on a background GenerationWorker (QThread).
 
-        Determines whether to use the background QThread worker path (normal
-        streaming chat) or the synchronous GUI-thread fallback (native tool
-        calling requiring QMessageBox confirmation).
+        All generation — including slash commands and messages whose tool
+        heuristics would previously have routed to the synchronous GUI-thread
+        path — is dispatched to the existing GenerationWorker so the GUI
+        thread never blocks on LLM inference or tool execution.  Tool
+        confirmations (SecurityLayer ASK) are marshalled back to the GUI
+        thread by the existing ``QMetaObject.invokeMethod`` blocking
+        mechanism in :meth:`_request_permission`, which is designed for
+        worker-thread callers.
 
-        Slash commands (lines starting with ``/``) are always routed through
-        the synchronous GUI-thread path, regardless of incidental keywords in
-        their arguments (e.g. ``/agent plan Otvori kalkulator``).  This
-        ensures deterministic routing: a slash command never switches between
-        sync and worker paths based on tool-keyword heuristics.  It also
-        guarantees that all events are published on the GUI thread, preserving
-        Qt thread-affinity for subscribers.
+        Routing (slash-command / tool-heuristic detection) is preserved
+        exactly as before — it only decides whether the native-tool path
+        inside ``Assistant.process_message`` is given the chance to run, not
+        which thread executes it.
         """
         if self._generation_active:
             logger.info(
@@ -530,19 +532,7 @@ class MainWindow(QMainWindow):
             self._assistant._cancel_event = self._cancel_event
         response = ""
         try:
-            lowered = text.strip().lower()
-            if images:
-                # Multimodal path — always the worker (streaming chat);
-                # images bypass tool heuristics.
-                response = self._start_generation_worker(text, images=images)
-            elif lowered.startswith("/"):
-                response = self._start_generation_sync(text)
-            else:
-                needs_tool = self._assistant._message_needs_tool(lowered)
-                if needs_tool:
-                    response = self._start_generation_sync(text)
-                else:
-                    response = self._start_generation_worker(text)
+            response = self._start_generation_worker(text, images=images)
         except Exception as exc:
             logger.exception("Generation error")
             self._chat.finish_streaming()
@@ -558,19 +548,69 @@ class MainWindow(QMainWindow):
         self._current_response = ""
         return response
 
-    def _start_generation_sync(self, text: str) -> str:
-        """Synchronous GUI-thread generation path (native tool calling).
+    def _start_generation_worker(self, text: str, images: list | None = None) -> str:
+        """Run generation via GenerationWorker(QThread) — never blocks the GUI.
 
-        Preserved from the original implementation for paths requiring
-        QMessageBox confirmation or other Qt widget calls.
+        Starts the worker and waits for its completion inside a nested
+        ``QEventLoop`` instead of the previous ``while … processEvents()``
+        busy-wait.  The event loop keeps processing normally (queued signal
+        delivery to GUI slots, paint, input, permission dialogs) while the
+        LLM/tool work happens on the worker thread.  The completion signal
+        (delivered on the GUI thread via queued connection) exits the loop.
         """
-        def pulse() -> None:
-            QApplication.processEvents()
-        return self._assistant.process_message(
-            text,
-            cancel_event=self._cancel_event,
-            pulse_callback=pulse,
+        assert self._cancel_event is not None
+        worker = GenerationWorker(
+            self._assistant, text, self._cancel_event, images
         )
+        self._generation_worker = worker
+
+        worker.token_emitted.connect(self._on_worker_token, Qt.ConnectionType.QueuedConnection)
+        worker.generation_cancelled.connect(self._on_worker_cancelled, Qt.ConnectionType.QueuedConnection)
+        worker.generation_failed.connect(self._on_worker_failed, Qt.ConnectionType.QueuedConnection)
+
+        result_holder: list = [None]
+
+        loop = QEventLoop()
+
+        def _on_finished(response: str) -> None:
+            result_holder[0] = ("finished", response)
+
+        def _on_cancelled() -> None:
+            result_holder[0] = ("cancelled", "")
+
+        def _on_failed(error: str) -> None:
+            result_holder[0] = ("failed", error)
+
+        # Completion handlers: record the outcome and exit the nested loop.
+        # QueuedConnection delivery guarantees these run on the GUI thread
+        # once the worker emits, so the loop cannot miss the signal.
+        worker.generation_finished.connect(
+            lambda response: (_on_finished(response), loop.quit()),
+            Qt.ConnectionType.QueuedConnection,
+        )
+        worker.generation_cancelled.connect(
+            lambda: (_on_cancelled(), loop.quit()),
+            Qt.ConnectionType.QueuedConnection,
+        )
+        worker.generation_failed.connect(
+            lambda error: (_on_failed(error), loop.quit()),
+            Qt.ConnectionType.QueuedConnection,
+        )
+
+        worker.start()
+        loop.exec()
+        worker.wait()
+        QApplication.processEvents()
+
+        self._generation_worker = None
+        if result_holder[0] is not None:
+            kind, payload = result_holder[0]
+            if kind == "finished":
+                self._on_worker_finished(payload)
+                return payload
+            elif kind in ("cancelled", "failed"):
+                return ""
+        return ""
 
     def _start_generation_worker(self, text: str, images: list | None = None) -> str:
         """Background generation via GenerationWorker(QThread).

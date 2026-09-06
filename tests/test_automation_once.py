@@ -281,9 +281,14 @@ class TestIntervalControl:
             schedule=ScheduleType.INTERVAL,
             interval_seconds=60,
         )
+        # Pin next_run to the fixture time so the first tick is unambiguously
+        # due regardless of the microseconds elapsed between the fixture call
+        # and register()'s internal datetime.now() (register only fills
+        # next_run when unset — see StubScheduler.register).
+        task.next_run = now - timedelta(seconds=1)
         scheduler.register(task)
 
-        scheduler.tick(registry, now=now)  # newly registered → due immediately
+        scheduler.tick(registry, now=now)  # due immediately (next_run in the past)
         scheduler.tick(registry, now=now + timedelta(seconds=30))  # not due yet
         assert registry.calls == 1
 
