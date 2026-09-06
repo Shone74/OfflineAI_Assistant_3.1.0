@@ -46,9 +46,14 @@ Without the CUDA wheel, the application runs on CPU (automatic fallback).
 
 ```
 pip install -r requirements-dev.txt
-pytest tests/            # 92 tests, headless (auto test-mode + offscreen)
-python main_original.py --test-runtime   # real GGUF model acceptance test
+pytest tests/            # full suite, headless (auto test-mode + offscreen)
 ```
+
+The current suite size and verification matrix live in `FEATURES.md`
+(single source of truth — avoid hardcoding counts in multiple documents).
+A real-GGUF runtime acceptance test is available via the legacy entry
+point: `python main_original.py --test-runtime` (requires local model
+files).
 
 ## Structure
 
@@ -62,13 +67,14 @@ python main_original.py --test-runtime   # real GGUF model acceptance test
 | `knowledge/` | RAG pipeline, document indexing |
 | `agent/` | LLM planner, ReAct, orchestrator, verifier |
 | `tools/` | 16+ tools with a permission layer |
-| `voice/` | STT (faster-whisper), TTS (pyttsx3), wake-word (stub) |
-| `automation/` | Workflow engine + scheduler |
+| `voice/` | STT (faster-whisper), TTS (pyttsx3), wake-word (openwakeword, optional) |
+| `automation/` | Workflow engine + scheduler (worker-thread execution) |
 | `docs/` | **Project documentation** (plan, status, design system, models) |
 | `Izgled Aplikaccije/` | Design previews (official theme reference) |
 
 ## Documentation
 
+- `FEATURES.md` — verified feature matrix + test counts (source of truth)
 - `docs/project_plan.md` — redesign plan
 - `docs/current_status.md` — progress status
 - `docs/design_system.md` — Graphite+Emerald specification
@@ -79,7 +85,10 @@ python main_original.py --test-runtime   # real GGUF model acceptance test
 ## Notes
 
 - The application is 100% offline — data never leaves the computer.
-- Voice (STT/TTS), vector memory (faiss), and wake-word are optional
-  extensions with stub fallback.
-- Vision (images in chat) is not implemented — multimodal models are
-  used only as text LLMs.
+- Voice (STT/TTS), vector memory (faiss), and wake-word (openwakeword) are
+  optional extensions with stub fallback.
+- Vision (images in chat) works with vision-capable GGUF models when their
+  `mmproj` projector file is placed next to the model; without a projector
+  the model runs text-only and image messages are politely refused.
+- Automation tasks and "Run Now" execute on background workers — the GUI
+  thread never blocks on tool/LLM work.

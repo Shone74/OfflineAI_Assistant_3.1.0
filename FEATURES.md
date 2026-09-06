@@ -1,10 +1,11 @@
 # Application Functionality Report
 
 **Application:** Offline AI Assistant
-**Report date:** 2026-09-06 (updated: Online API feature added)
+**Report date:** 2026-09-06 (updated: hardening pass — async generation,
+cancel-preserving history, robust reasoner, dependency extras)
 **Verification method:** live end-to-end execution of every feature in a headless
 environment (`verify_features.py` + supplementary UI/dialog checks), plus the full
-pytest suite (156/156 passing).
+pytest suite (335/335 passing).
 
 **Status legend:**
 
@@ -185,9 +186,25 @@ Features are ordered so that each level depends only on the levels above it
    back to the local engine. Images are NOT forwarded online (v1 — text only).
    Free-tier models have daily rate limits (HTTP 429 is surfaced clearly).
 
+## Post-Redesign Hardening Additions (2026-09-06)
+
+| # | Feature | Status | Notes |
+|---|---------|--------|-------|
+| H.1 | Automation: ONCE tasks execute exactly once | ✅ RADI | Success disables the task (persisted); regression suite `tests/test_automation_once.py` |
+| H.2 | Automation: scheduler tick on background worker | ✅ RADI | `AutomationTaskWorker`/`AutomationDispatcher`; GUI never blocks on tasks (`tests/test_automation_worker.py`) |
+| H.3 | Automation: "Run Now" on background worker | ✅ RADI | In-flight protection prevents duplicate execution (`tests/test_run_now_async.py`) |
+| H.4 | Vector memory: incremental FAISS updates | ✅ RADI | O(dim) per add instead of O(N·dim) rebuild; remove() keeps legitimate rebuild (`tests/test_vector_memory_faiss.py`) |
+| H.5 | Security: fail-closed regression lock | ✅ RADI | 22 tests locking ALLOW/ASK/DENY contracts (`tests/test_security_fail_closed.py`) |
+| H.6 | Chat: cancelled generations preserve partial text | ✅ RADI | Saved to history with "(generation cancelled)" marker; no AI_RESPONSE_RECEIVED on cancel (`tests/test_cancel_preserves_partial.py`) |
+| H.7 | Chat: all MainWindow generation on background worker | ✅ RADI | Slash commands + tool heuristics included; busy-wait removed (`tests/test_main_window_async_generation.py`) |
+| H.8 | Agent: robust LLMReasoner yes/no classification | ✅ RADI | Word-boundary matching; ambiguous → stub fallback (`tests/test_llm_reasoner.py`) |
+| H.9 | Knowledge: stub-embedding warning banner | ✅ RADI | Dashboard shows degraded-search warning (`tests/test_knowledge_embedding_warning.py`) |
+| H.10 | Dependencies: optional docs extras declared | ✅ RADI | pypdf/PyMuPDF/python-docx/docx2txt/bs4 in `docs` extra + anti-drift test (`tests/test_dependency_declarations.py`) |
+
 ## Verification Artifacts
 
 - `verify_features.py` — 37 executable checks, all WORKS (run with
   `OFFLINE_AI_TEST_MODE=1 QT_QPA_PLATFORM=offscreen python verify_features.py`)
-- Full pytest suite: **172/172 passing** (incl. 43 multi-provider Online-API tests)
+- Full pytest suite: **335/335 passing** (incl. multi-provider Online-API,
+  automation, security, FAISS, async-generation and cancel-preservation suites)
 - `ruff check`: clean

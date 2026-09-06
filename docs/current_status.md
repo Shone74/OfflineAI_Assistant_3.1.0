@@ -1,4 +1,41 @@
-# Current Status — Offline AI Assistant Redesign
+# Current Status — Offline AI Assistant
+
+**Last updated:** 2026-09-06 (post-redesign hardening + Online API + Vision)
+**Test suite:** see `FEATURES.md` (single source of truth for verified counts)
+**Plan:** `docs/project_plan.md`
+
+> The redesign phases below are HISTORICAL RECORD (all completed).
+> Post-redesign work continued in separate maintenance tasks; the sections
+> under "State overview" describe the state as of 2026-09-04 and are kept
+> for reference.  For the current verified feature matrix, see `FEATURES.md`.
+
+## Post-redesign maintenance log (2026-09-05 → 2026-09-06)
+
+Hardening and correctness work performed after the redesign completed:
+
+- Baseline source-control checkpoint (Online API engine + Vision support +
+  English localization committed together with their test suites).
+- ONCE automation-task re-execution bug fixed (one-shot tasks no longer
+  re-run forever after success).
+- Automation scheduler and "Run Now" moved to background workers — the GUI
+  thread never blocks on task/tool/workflow execution.
+- FAISS vector index updates made incremental on add (was: full rebuild
+  per insertion).
+- Security fail-closed behaviour locked with a dedicated regression suite
+  (the reported "validator fail-open" finding was investigated and NOT
+  confirmed).
+- Cancelled generations now preserve their partial response in the
+  conversation history, marked as cancelled.
+- All MainWindow generation paths (including slash commands and tool
+  heuristics) run on the background worker; busy-wait polling removed.
+- LLMReasoner yes/no classification made robust (word-boundary matching).
+- Knowledge dashboard warns when embeddings are the non-semantic stub.
+
+Status legend: ⬜ Not started · 🟡 In progress · ✅ Completed · ⛔ Blocked · ➖ N/A
+
+---
+
+# Historical: Redesign Status (as of 2026-09-04)
 
 **Last updated:** 2026-09-04 (Phase 7 completed — Wake Word + Automatic Listening)
 **Current phase:** All phases completed (7/9)

@@ -32,6 +32,6 @@ llama-cpp-python is available (see README §GPU acceleration).
 
 ## Problems?
 - Logs: `%LOCALAPPDATA%\OfflineAI\logs\`
-- Tests: `pytest tests/` (92 tests)
-- Runtime test: `python main_original.py --test-runtime`
+- Tests: `pytest tests/` (see `FEATURES.md` for the current verified count)
+- Runtime test: `python main_original.py --test-runtime` (requires local GGUF models)
 - Documentation: `docs/` folder (plan, status, design, models)
