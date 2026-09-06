@@ -1372,7 +1372,19 @@ class Assistant:
             self._memory.add_assistant_message(response)
             pub("MEMORY_UPDATED", data={"type": "assistant_message"})
 
-        if not was_cancelled:
+        if was_cancelled:
+            # A cancelled generation still preserves whatever partial text
+            # was streamed — it belongs to the conversation history — but it
+            # is explicitly marked so it can never be mistaken for a
+            # completed assistant answer.  AI_RESPONSE_RECEIVED is NOT
+            # published (cancellation is not a normal response; publishing
+            # it would duplicate the streamed bubble in the UI).
+            if self._memory is not None and response.strip():
+                self._memory.add_assistant_message(
+                    f"{response}\n\n_(generation cancelled)_"
+                )
+                pub("MEMORY_UPDATED", data={"type": "assistant_message_cancelled"})
+        else:
             pub(
                 "AI_RESPONSE_RECEIVED",
                 data={
