@@ -17,4 +17,5 @@ pywin32>=306; platform_system == 'Windows'
 #   voice:    openwakeword      (wake-word detection; stub fallback)
 #   vector:   faiss-cpu, sentence-transformers   (vector memory; kNN fallback)
 #   scheduler: croniter          (cron workflows; interval fallback)
+#   docs:     pypdf, PyMuPDF, python-docx, docx2txt, beautifulsoup4   (document parsing; raw-text fallback)
 #   dev:      pytest, pytest-qt, ruff, mypy      (see requirements-dev.txt)
