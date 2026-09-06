@@ -553,6 +553,7 @@ class ApplicationManager:
             voice=self._voice,
             plugin_manager=self._plugin_manager,
             automation_manager=self._automation,
+            automation_dispatcher=getattr(self, "_automation_dispatcher", None),
         )
         self._voice.flush_pending_startup_errors()
         if show_main_window:

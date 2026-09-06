@@ -174,6 +174,7 @@ class MainWindow(QMainWindow):
         voice: VoiceManager | None = None,
         plugin_manager: PluginManager | None = None,
         automation_manager: Any = None,
+        automation_dispatcher: Any = None,
     ) -> None:
         super().__init__()
         self._config = config
@@ -184,6 +185,7 @@ class MainWindow(QMainWindow):
         self._voice = voice
         self._plugin_manager = plugin_manager
         self._automation_manager = automation_manager
+        self._automation_dispatcher = automation_dispatcher
         self._current_response = ""
         self._response_displayed = False
         self._tokens_streamed = False
@@ -208,6 +210,14 @@ class MainWindow(QMainWindow):
 
         if self._security is not None:
             self._security.set_approval_callback(self._request_permission)
+
+        # Run Now completion (async dispatcher path): refresh the automation
+        # dashboard and surface the outcome on the status bar.  The signal is
+        # emitted on the GUI thread by the dispatcher after finalization.
+        if self._automation_dispatcher is not None:
+            self._automation_dispatcher.task_finalized.connect(
+                self._on_run_now_finalized
+            )
 
         self._install_shortcuts()
         self._apply_accessibility()
@@ -1385,8 +1395,53 @@ class MainWindow(QMainWindow):
     def _on_run_scheduled_task(self, name: str) -> None:
         if self._automation_manager is None:
             return
+        # GUI Run Now path: submit through the AutomationDispatcher so the
+        # actual task/tool/workflow execution happens on an
+        # AutomationTaskWorker — never synchronously on the GUI thread.
+        # Completion (status bar + dashboard refresh) arrives asynchronously
+        # via the dispatcher's task_finalized signal.
+        dispatcher = self._automation_dispatcher
+        if dispatcher is not None:
+            task = self._automation_manager.get_task(name)
+            if task is None:
+                self._status.showMessage(f"Task '{name}' not found", 5000)
+                return
+            if not task.enabled:
+                self._status.showMessage(f"Task '{name}' is disabled", 5000)
+                return
+            submitted = dispatcher.run_now(name)
+            if submitted:
+                self._status.showMessage(f"Task '{name}' started…", 3000)
+            elif dispatcher.is_in_flight(name):
+                self._status.showMessage(
+                    f"Task '{name}' is already running", 5000
+                )
+            return
+        # Fallback (no dispatcher wired — e.g. legacy/test constructions):
+        # keep the historical synchronous behaviour.
         result = self._automation_manager.run_task_now(name)
         self._status.showMessage(f"Task '{name}': {result.message}", 5000)
+        self._refresh_automation_dashboard()
+
+    def _on_run_now_finalized(self, task_name: str, success: bool) -> None:
+        """GUI-thread slot: a dispatcher-executed task finished (Run Now).
+
+        Shows the outcome on the status bar and refreshes the automation
+        dashboard.  Never blocks — connected to the dispatcher's
+        ``task_finalized`` signal which is emitted on the GUI thread after
+        state finalization.
+        """
+        task = (
+            self._automation_manager.get_task(task_name)
+            if self._automation_manager is not None
+            else None
+        )
+        outcome = (
+            task.result
+            if task is not None and task.result
+            else ("done" if success else "failed")
+        )
+        self._status.showMessage(f"Task '{task_name}': {outcome}", 5000)
         self._refresh_automation_dashboard()
 
     def _on_task_enabled_changed(self, name: str, enabled: bool) -> None:

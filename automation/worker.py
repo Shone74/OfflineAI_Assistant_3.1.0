@@ -132,6 +132,38 @@ class AutomationDispatcher(QObject):
     def is_in_flight(self, task_name: str) -> bool:
         return task_name in self._in_flight
 
+    # ------------------------------------------------------------------ #
+    # Run Now (called on the GUI thread by the Automation dashboard)
+    # ------------------------------------------------------------------ #
+    def run_now(self, name: str, now: datetime | None = None) -> bool:
+        """Submit a task for immediate off-GUI-thread execution ("Run Now").
+
+        Performs the same lightweight pre-checks as the synchronous
+        ``AutomationManager.run_task_now`` (unknown task, disabled task) and
+        additionally rejects duplicate submissions while the task is already
+        in flight (whether started by the scheduler tick or a previous Run
+        Now).  The actual execution, completion finalization, and shutdown
+        behavior all reuse the existing :meth:`submit` / worker /
+        ``_on_task_finished`` infrastructure — no second worker path exists.
+
+        Returns ``True`` when a new execution was submitted; ``False`` when
+        the request was rejected (unknown/disabled/in-flight/shutting down).
+        """
+        task = self._am.get_task(name)
+        if task is None:
+            logger.info("Run Now rejected — task '%s' not found", name)
+            return False
+        if not task.enabled:
+            logger.info("Run Now rejected — task '%s' is disabled", name)
+            return False
+        if not self._accepting:
+            logger.info("Run Now rejected — dispatcher is shutting down")
+            return False
+        if self.is_in_flight(name):
+            logger.info("Run Now rejected — task '%s' is already running", name)
+            return False
+        return self.submit(task, self._am._dispatch_execute, now)
+
     @property
     def in_flight_count(self) -> int:
         return len(self._in_flight)

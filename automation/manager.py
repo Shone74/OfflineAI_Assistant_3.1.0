@@ -204,6 +204,11 @@ class AutomationManager:
         ``next_run``) consistently with scheduler semantics.
 
         Returns a :class:`ToolResult` describing the outcome.
+
+        Note: this is the synchronous API kept for tests and non-Qt callers.
+        The GUI "Run Now" button routes through
+        :class:`~automation.worker.AutomationDispatcher.run_now` instead, so
+        its execution never blocks the GUI thread.
         """
         from tools.base import ToolResult
 
