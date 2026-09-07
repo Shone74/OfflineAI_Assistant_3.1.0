@@ -70,7 +70,7 @@ files).
 | `voice/` | STT (faster-whisper), TTS (pyttsx3), wake-word (openwakeword, optional) |
 | `automation/` | Workflow engine + scheduler (worker-thread execution) |
 | `docs/` | **Project documentation** (plan, status, design system, models) |
-| `Izgled Aplikaccije/` | Design previews (official theme reference) |
+| `design_previews/` | Design previews (official theme reference) |
 
 ## Documentation
 

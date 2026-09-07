@@ -1,6 +1,6 @@
 """Reference-based application shell for the final standalone build.
 
-Redesign according to the official workspace design (Izgled Aplikaccije/
+Redesign according to the official workspace design (design_previews/
 assistant_workspace_preview.py + docs/design_system.md):
 
 - Topbar: ☰ (toggle sidebar) · assistant name · "● Local" · Context (toggle) · ⚙

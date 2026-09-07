@@ -1,6 +1,6 @@
 """Design tokens — the single source of truth for project colors.
 
-All values are extracted from the official previews in ``Izgled Aplikaccije/``
+All values are extracted from the official previews in ``design_previews/``
 (documentation: docs/design_system.md). No hex may be hardcoded
 outside this module.
 

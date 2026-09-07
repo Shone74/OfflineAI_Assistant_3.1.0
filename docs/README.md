@@ -8,7 +8,7 @@ This folder is the **single source of truth** for the redesign plan and progress
 |---|---|---|
 | [`project_plan.md`](project_plan.md) | **PLAN** — map of all steps (9 phases, 47 steps), dependencies, verification criteria | Rarely (only when the plan structure changes) |
 | [`current_status.md`](current_status.md) | **STATUS** — progress tracking per step, change log, open issues | **After every successfully completed step** |
-| [`design_system.md`](design_system.md) | Complete specification of the target design (palettes, components, layout) from `Izgled Aplikaccije/` | When the design is changed |
+| [`design_system.md`](design_system.md) | Complete specification of the target design (palettes, components, layout) from `design_previews/` | When the design is changed |
 | [`models_report.md`](models_report.md) | Analysis of candidates from E:\models, model decisions, paths, inference parameters | When the model selection changes |
 | [`environment.md`](environment.md) | Hardware, Python environments (3.11 verified), standard commands, runtime paths | When the environment changes |
 | [`qa_checklist.md`](qa_checklist.md) | Definition of "no regression" — smoke suite, functional matrix F1–F20, visual checks | Stable |

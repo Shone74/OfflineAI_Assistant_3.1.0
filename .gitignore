@@ -52,4 +52,4 @@ desktop.ini
 *.swp
 
 # Design preview outputs (generated HTML)
-Izgled Aplikaccije/*.html
+design_previews/*.html

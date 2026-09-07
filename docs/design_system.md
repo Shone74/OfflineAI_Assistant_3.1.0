@@ -1,6 +1,6 @@
 # Design System — "Graphite + Emerald" (Official Theme)
 
-**Source of truth:** `Izgled Aplikaccije/*.py` (HTML previews + PySide6 workspace prototype)
+**Source of truth:** `design_previews/*.py` (HTML previews + PySide6 workspace prototype)
 **Purpose:** Reference for PHASE 2 (tokens.py / qss.py / components.py). Nothing in this document is invented — everything is extracted from the preview files.
 
 ---

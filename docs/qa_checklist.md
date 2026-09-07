@@ -49,7 +49,7 @@ $env:QT_QPA_PLATFORM="offscreen"; $env:OFFLINE_AI_TEST_MODE="1"
 
 ## 4. Visual checks (after design steps)
 
-- Comparison with the `Izgled Aplikaccije/` previews (side-by-side)
+- Comparison with the `design_previews/` previews (side-by-side)
 - Palettes: the wizard screen uses the installer palette, the app uses the workspace palette — no mixing
 - No hardcoded hex values outside `ui/design/tokens.py` (grep check in 2.1)
 - Segoe UI fonts, sizes per design_system.md §4

@@ -2,7 +2,7 @@
 
 **Plan version:** 1.0
 **Date created:** 2026-09-04
-**Goal:** Redesign the application according to the reference design from `Izgled Aplikaccije/` with **zero functional regression** — everything that works today must continue to work across the entire application.
+**Goal:** Redesign the application according to the reference design from `design_previews/` with **zero functional regression** — everything that works today must continue to work across the entire application.
 
 ---
 
@@ -10,9 +10,9 @@
 
 | What | Where |
 |---|---|
-| Design previews (HTML/Python) | `Izgled Aplikaccije/` — 9 files |
-| Main workspace design (PySide6) | `Izgled Aplikaccije/assistant_workspace_preview.py` |
-| Official theme spec | `Izgled Aplikaccije/official_theme_preview.py` |
+| Design previews (HTML/Python) | `design_previews/` — 9 files |
+| Main workspace design (PySide6) | `design_previews/assistant_workspace_preview.py` |
+| Official theme spec | `design_previews/official_theme_preview.py` |
 | Design system report | `docs/design_system.md` |
 | Models report | `docs/models_report.md` |
 | Current status | `docs/current_status.md` |
@@ -132,8 +132,8 @@ Goal: all functional pages work within the new shell. Not a single page is lost 
 
 | # | Step | Details | Verification |
 |---|---|---|---|
-| 8.1 | Remove dead weight | Decide the fate of: empty folders (assets/, data/, config/ etc. — keep with .gitignore), `Izgled Aplikaccije/` (keep as the design reference), `main_original.py` (keep for --test-runtime), the duplicated settings mechanism (ConfigManager as primary). | Clean structure, documented |
-| 8.2 | Typo fix "Izgled Aplikaccije" | Rename the folder to "Izgled Aplikacije" or keep it (paths in docs must reflect the actual name). Decision: keep the name, document it. | Documented |
+| 8.1 | Remove dead weight | Decide the fate of: empty folders (assets/, data/, config/ etc. — keep with .gitignore), `design_previews/` (keep as the design reference), `main_original.py` (keep for --test-runtime), the duplicated settings mechanism (ConfigManager as primary). | Clean structure, documented |
+| 8.2 | Typo fix "design_previews" | Rename the folder to "Izgled Aplikacije" or keep it (paths in docs must reflect the actual name). Decision: keep the name, document it. | Documented |
 |  Izgled | — | — | — |
 | 8.3 | Update README/START_HERE | New instructions, hardware requirements, model setup (models/llm), design documentation. | README accurate |
 | 8.4 | Final E2E testing | Full cycle: wizard → chat with the real model → memory → knowledge → voice → settings → restart persistence. | E2E checklist green |
