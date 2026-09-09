@@ -61,7 +61,11 @@ class OpenWakeWord(WakeWordProvider):
     #: Default detection confidence threshold.
     _THRESHOLD: float = 0.5
     #: Maximum time (seconds) to wait for the detection thread to join.
-    _JOIN_TIMEOUT: float = 2.0
+    # L12: the detection loop checks the stop flag between ~64 ms stream
+    # reads, so a cooperative stop completes within a couple of read
+    # cycles; 0.5 s is comfortably above that while keeping the GUI-side
+    # wait (stop() may run on the GUI thread) short.
+    _JOIN_TIMEOUT: float = 0.5
 
     def __init__(self, hotword: str = "hey_jarvis", threshold: float | None = None) -> None:
         from openwakeword import Model

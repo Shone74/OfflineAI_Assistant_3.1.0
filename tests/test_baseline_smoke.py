@@ -7,10 +7,14 @@ ostati ispravna kroz ceo redizajn. Svaki test je namerno mali i headless
 Pokriva: EventBus, ConfigManager, model discovery/manager, stub engine,
 memoriju (3 sloja), RAG pipeline, tool registry, security sloj, agent
 repository, database migracije, AppShell.
+
+Model-dependent tests SKIP (not FAIL) when GGUF models are unavailable,
+so CI can run without local model files.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -20,6 +24,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_LLM_DIR = PROJECT_ROOT / "models" / "llm"
+
+# Helper to skip when project models are not present (CI environments)
+def _has_project_models() -> bool:
+    """Check if the expected GGUF models exist in the project directory."""
+    if not PROJECT_LLM_DIR.exists():
+        return False
+    qwen = PROJECT_LLM_DIR / "Qwen2.5-Coder-7B-Q4_K_M.gguf"
+    phi = PROJECT_LLM_DIR / "microsoft_Phi-4-mini-instruct-Q6_K_L.gguf"
+    return qwen.exists() and phi.exists()
+
+# Pytest marker for model-dependent tests
+requires_models = pytest.mark.skipif(
+    not _has_project_models(),
+    reason="Project GGUF models not available (CI environment)",
+)
 
 
 # --- core: EventBus / ConfigManager ----------------------------------------
@@ -74,6 +93,7 @@ class TestCoreServices:
 # --- ai: model discovery / manager / engine ---------------------------------
 
 class TestModelSystem:
+    @requires_models
     def test_discovery_finds_project_models(self):
         from ai.models.discovery import discover_all_models
         from ai.models.model_loader import ModelType
@@ -89,6 +109,7 @@ class TestModelSystem:
         chat_models = [m for m in models if m.model_type in (ModelType.LLM, ModelType.VISION_LLM)]
         assert len(chat_models) >= 2
 
+    @requires_models
     def test_discovered_model_capabilities(self):
         from ai.models.discovery import discover_all_models
 
@@ -108,7 +129,9 @@ class TestModelSystem:
 
         models = discover_all_models()
         assert isinstance(models, list)
-        assert len(models) >= 2  # bar 2 projektna modela
+        # In CI without models, this returns empty list - that's fine
+        if _has_project_models():
+            assert len(models) >= 2  # bar 2 projektna modela
 
     def test_model_manager_test_mode_stub(self, tmp_path):
         from ai.models.model_manager import ModelManager
@@ -124,6 +147,7 @@ class TestModelSystem:
         assert loader is not None
         assert getattr(loader, "is_stub", False) is True
 
+    @requires_models
     def test_model_manager_rescan_lists_models(self):
         from ai.models.model_manager import ModelManager
 
@@ -145,6 +169,7 @@ class TestModelSystem:
         out = engine.generate("Pozdrav")
         assert isinstance(out, str) and len(out) > 0
 
+    @requires_models
     def test_gguf_metadata_reader_on_project_model(self):
         from ai.models.model_loader import _read_gguf_metadata
 

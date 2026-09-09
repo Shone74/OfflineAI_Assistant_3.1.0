@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from PySide6.QtCore import Q_ARG, QEventLoop, QMetaObject, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QShortcut
@@ -198,6 +198,10 @@ class MainWindow(QMainWindow):
         self._agent_active = False
         self._permission_result: QMessageBox.StandardButton | None = None
         self._event_sub_ids: list[tuple[str, str]] = []
+        # H3: knowledge worker tracking (search/index off the GUI thread).
+        self._knowledge_workers: list = []
+        self._knowledge_searching = False
+        self._knowledge_indexing = False
 
         self.setWindowTitle(config.get("app.name", "Offline AI Assistant"))
         self.resize(
@@ -612,60 +616,6 @@ class MainWindow(QMainWindow):
                 return ""
         return ""
 
-    def _start_generation_worker(self, text: str, images: list | None = None) -> str:
-        """Background generation via GenerationWorker(QThread).
-
-        Uses QApplication.processEvents() to pump the event loop while
-        waiting for the worker, keeping the return value synchronous
-        for callers (including tests).
-        """
-        assert self._cancel_event is not None
-        worker = GenerationWorker(
-            self._assistant, text, self._cancel_event, images
-        )
-        self._generation_worker = worker
-
-        worker.token_emitted.connect(self._on_worker_token, Qt.ConnectionType.QueuedConnection)
-        worker.generation_cancelled.connect(self._on_worker_cancelled, Qt.ConnectionType.QueuedConnection)
-        worker.generation_failed.connect(self._on_worker_failed, Qt.ConnectionType.QueuedConnection)
-
-        done = threading.Event()
-        result_holder: list = [None]
-
-        def _on_finished(response: str) -> None:
-            result_holder[0] = ("finished", response)
-            done.set()
-
-        def _on_cancelled() -> None:
-            result_holder[0] = ("cancelled", "")
-            done.set()
-
-        def _on_failed(error: str) -> None:
-            result_holder[0] = ("failed", error)
-            done.set()
-
-        worker.generation_finished.connect(_on_finished, Qt.ConnectionType.DirectConnection)
-        worker.generation_cancelled.connect(_on_cancelled, Qt.ConnectionType.DirectConnection)
-        worker.generation_failed.connect(_on_failed, Qt.ConnectionType.DirectConnection)
-
-        worker.start()
-        # Wait for the worker to finish, processing Qt events so queued
-        # signal slots (GUI-thread handlers) are delivered.
-        while not done.is_set():
-            QApplication.processEvents()
-        worker.wait()
-        QApplication.processEvents()
-
-        self._generation_worker = None
-        if result_holder[0] is not None:
-            kind, payload = result_holder[0]
-            if kind == "finished":
-                self._on_worker_finished(payload)
-                return payload
-            elif kind in ("cancelled", "failed"):
-                return ""
-        return ""
-
     def _on_worker_token(self, token: str) -> None:
         """GUI-thread slot: publishes GENERATION_TOKEN and updates chat UI."""
         if not self._chat.is_streaming():
@@ -920,6 +870,11 @@ class MainWindow(QMainWindow):
         key = data.get("key", "")
         if key == "ui.theme":
             self._theme.apply(data.get("value", "dark"))
+        elif key == "models.storage_root":
+            # PHASE 8: the canonical models-root key drives the runtime
+            # ModelManager immediately (root -> llm category dir), the
+            # same way the legacy ai.models_dir mirror does below.
+            self._apply_models_root_change(data.get("value"))
         elif key == "ai.models_dir":
             models_dir = data.get("value")
             mm = getattr(self._assistant, "model_manager", None)
@@ -927,15 +882,7 @@ class MainWindow(QMainWindow):
                 from pathlib import Path
 
                 mm.set_models_dir(Path(models_dir))
-                engine = getattr(self._assistant, "_engine", None)
-                if engine is not None and hasattr(engine, "configure"):
-                    try:
-                        engine.configure(mm)
-                    except Exception as exc:
-                        logger.warning("Engine reconfiguration after models_dir change failed: %s", exc)
-                        if hasattr(self, "_models_page"):
-                            self._models_page.set_model_manager(mm)
-                            self._models_page._on_refresh()
+                self._after_models_dir_changed(mm)
         elif key in (
             "ai.max_tokens", "ai.temperature", "ai.top_p", "ai.top_k",
             "ai.min_p", "ai.repeat_penalty",
@@ -953,6 +900,51 @@ class MainWindow(QMainWindow):
                 logger.warning(
                     "memory.embedding_model changed — restart required for new backend to take effect"
                 )
+
+    def _apply_models_root_change(self, models_root: object) -> None:
+        """Propagate a canonical ``models.storage_root`` change to runtime.
+
+        The ModelManager always scans the llm CATEGORY dir under the
+        selected root (Phase 3 contract) — the same derivation used at
+        startup and persisted by ``set_models_root``.  Changing the
+        root never copies, moves, or deletes model files.
+        """
+        if not models_root:
+            return
+        mm = getattr(self._assistant, "model_manager", None)
+        if mm is None:
+            return
+        try:
+            from pathlib import Path
+
+            root = Path(str(models_root))
+            if not root.is_absolute():
+                logger.warning(
+                    "Ignoring non-absolute models.storage_root value: %r", models_root
+                )
+                return
+            mm.set_models_dir(root / "llm")
+            self._after_models_dir_changed(mm)
+        except Exception as exc:
+            logger.warning("models.storage_root change could not be applied: %s", exc)
+
+    def _after_models_dir_changed(self, mm: object) -> None:
+        """Shared post-change wiring: engine reconfigure + models page sync."""
+        engine = getattr(self._assistant, "_engine", None)
+        if engine is not None and hasattr(engine, "configure"):
+            try:
+                engine.configure(mm)
+            except Exception as exc:
+                logger.warning("Engine reconfiguration after models_dir change failed: %s", exc)
+                if hasattr(self, "_models_page"):
+                    self._models_page.set_model_manager(mm)
+                    self._models_page._on_refresh()
+        if hasattr(self, "_models_page"):
+            try:
+                self._models_page.set_model_manager(mm)
+                self._models_page._on_refresh()
+            except Exception as exc:
+                logger.debug("Models page refresh after models_dir change failed: %s", exc)
 
     def _on_model_loaded(self, event_type: str, data: dict) -> None:
         model_name = data.get("model", "unknown")
@@ -1147,6 +1139,13 @@ class MainWindow(QMainWindow):
             self._agent_worker = None
             self._agent_active = False
             self._agent_cancel_event = None
+        # H3: bounded-wait any in-flight knowledge workers (search/index
+        # are short, cooperative operations — they finish on their own;
+        # no terminate is ever used here).
+        for kworker in getattr(self, "_knowledge_workers", []) or []:
+            if kworker.isRunning():
+                kworker.wait(5000)
+        self._knowledge_workers = []
         self._chat.finish_streaming()
         if self._tray is not None and self._tray._tray.isVisible():
             if self._voice is not None:
@@ -1521,10 +1520,34 @@ class MainWindow(QMainWindow):
         self._knowledge_dashboard.set_statistics(knowledge.get_statistics())
 
     def _on_knowledge_search(self, query: str) -> None:
-        """Handle knowledge search request from KnowledgeDashboard."""
-        context, results = self._assistant.run_knowledge_search(query)
-        self._knowledge_dashboard.display_search_results(context, results)
-        self._status.showMessage(f"Searched knowledge: {query}", 3000)
+        """Handle knowledge search request from KnowledgeDashboard.
+
+        H3: the search (embedding + vector scan) runs on a worker thread —
+        it must never block the GUI thread on a large index.
+        """
+        if getattr(self, "_knowledge_searching", False):
+            self._status.showMessage("Search already in progress", 2000)
+            return
+
+        def _on_completed(context: str, results: list) -> None:
+            self._knowledge_searching = False
+            self._knowledge_dashboard.display_search_results(context, results)
+            self._status.showMessage(f"Searched knowledge: {query}", 3000)
+
+        def _on_failed(error: str) -> None:
+            self._knowledge_searching = False
+            self._status.showMessage(f"Knowledge search failed: {error}", 5000)
+
+        from ui.knowledge_worker import start_knowledge_search
+
+        self._knowledge_searching = True
+        start_knowledge_search(
+            self._assistant,
+            query,
+            _on_completed,
+            _on_failed,
+            self._knowledge_workers,
+        )
 
     def _refresh_models_page(self) -> None:
         model_manager = getattr(self._assistant, "model_manager", None)
@@ -1628,25 +1651,40 @@ class MainWindow(QMainWindow):
         knowledge = getattr(self._assistant, "knowledge", None)
         if knowledge is None:
             return
-        total = knowledge.index_directory(directory)
-        self._status.showMessage(f"Indexed {total} chunks from {directory}", 5000)
-        self._refresh_knowledge_dashboard()
+        self._run_knowledge_index(knowledge, "index_directory", directory)
 
     def _on_knowledge_index_file(self, file_path: str) -> None:
         knowledge = getattr(self._assistant, "knowledge", None)
         if knowledge is None:
             return
-        total = knowledge.index_document(file_path)
-        self._status.showMessage(f"Indexed {total} chunks from {file_path}", 5000)
-        self._refresh_knowledge_dashboard()
+        self._run_knowledge_index(knowledge, "index_document", file_path)
 
     def _on_knowledge_rebuild(self, directory: str) -> None:
         knowledge = getattr(self._assistant, "knowledge", None)
         if knowledge is None:
             return
-        total = knowledge.rebuild(directory)
-        self._status.showMessage(f"Rebuilt {total} chunks from {directory}", 5000)
-        self._refresh_knowledge_dashboard()
+        self._run_knowledge_index(knowledge, "rebuild", directory)
+
+    def _run_knowledge_index(self, knowledge: Any, operation: str, target: str) -> None:
+        """H3: run an indexing operation on a worker thread, refresh the
+        dashboard when it completes."""
+        if getattr(self, "_knowledge_indexing", False):
+            self._status.showMessage("Indexing already in progress", 2000)
+            return
+
+        def _on_completed(count: int, op: str) -> None:
+            self._knowledge_indexing = False
+            self._status.showMessage(f"Indexed {count} chunks ({op})", 5000)
+            self._refresh_knowledge_dashboard()
+
+        def _on_failed(error: str) -> None:
+            self._knowledge_indexing = False
+            self._status.showMessage(f"Indexing failed: {error}", 5000)
+
+        from ui.knowledge_worker import start_knowledge_index
+
+        self._knowledge_indexing = True
+        start_knowledge_index(knowledge, operation, target, _on_completed, _on_failed, self._knowledge_workers)
 
     def _on_knowledge_delete(self, doc_id: str) -> None:
         knowledge = getattr(self._assistant, "knowledge", None)

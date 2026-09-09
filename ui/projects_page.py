@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.logger import get_logger
+from tools.file_security import PathValidationError
 
 logger = get_logger("projects_page")
 
@@ -587,6 +588,11 @@ class ProjectsPage(QWidget):
                 self._show_status("Project created successfully")
             except ValueError as exc:
                 self._show_error(str(exc))
+            except PathValidationError as exc:
+                # Filesystem security denial (write roots policy) — surfaced
+                # as a clear authorization error; ProjectManager is the
+                # security boundary, the UI only reports.
+                self._show_error(f"Workspace not authorized: {exc}")
             except Exception as exc:
                 logger.exception("Failed to create project")
                 self._show_error(f"Failed to create project: {exc}")
@@ -625,6 +631,9 @@ class ProjectsPage(QWidget):
                     self._show_status("Project updated")
                 except ValueError as exc:
                     self._show_error(str(exc))
+                except PathValidationError as exc:
+                    # Filesystem security denial (write roots policy).
+                    self._show_error(f"Workspace not authorized: {exc}")
                 except Exception as exc:
                     logger.exception("Failed to update project")
                     self._show_error(f"Failed to update project: {exc}")
@@ -643,29 +652,39 @@ class ProjectsPage(QWidget):
                 f"Workspace path: {proj.workspace_path}\n\n"
                 f"Physical files will be preserved."
             )
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Delete | QMessageBox.StandardButton.Cancel)
-            msg_box.addButton(
+            # Note: Qt has no StandardButton.Delete — custom buttons keep the
+            # three-way choice (Delete / Also delete files / Cancel).
+            btn_delete = msg_box.addButton(
+                "Delete", QMessageBox.ButtonRole.DestructiveRole
+            )
+            btn_delete_files = msg_box.addButton(
                 "Also delete files", QMessageBox.ButtonRole.AcceptRole
             )
-            msg_box.button(QMessageBox.StandardButton.Cancel).setStyleSheet(
+            btn_cancel = msg_box.addButton(
+                "Cancel", QMessageBox.ButtonRole.RejectRole
+            )
+            btn_cancel.setStyleSheet(
                 f"background: {_GRAPHITE_BORDER}; color: {_TEXT_PRIMARY};"
             )
-            result = msg_box.exec()
+            msg_box.setDefaultButton(btn_cancel)
+            msg_box.exec()
 
             btn = msg_box.clickedButton()
-            if btn is not None and btn.text() == "Also delete files":
-                from pathlib import Path
-
+            if btn is btn_delete_files:
+                # Route the destructive operation through ProjectManager so
+                # WRITE authorization (filesystem security policy) is
+                # enforced BEFORE any deletion runs.  The UI never calls
+                # shutil.rmtree on an unvalidated path.
                 try:
-                    ws = Path(proj.workspace_path)
-                    if ws.exists():
-                        import shutil
-                        shutil.rmtree(ws)
+                    self._project_mgr.delete_workspace_files(proj.id)
+                except PathValidationError as exc:
+                    self._show_error(f"Deletion not authorized: {exc}")
+                    return
                 except Exception as exc:
                     logger.exception("Failed to delete workspace files")
                     self._show_error(f"Could not delete files: {exc}")
                     return
-            elif result != QMessageBox.StandardButton.Delete:
+            elif btn is not btn_delete:
                 return
 
         try:

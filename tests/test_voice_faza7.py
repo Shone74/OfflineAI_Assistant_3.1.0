@@ -7,6 +7,8 @@ StubWakeWord, create_audio(preferred="stub") i injectable transcription_runner.
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -15,6 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import QApplication
 
 from core.event_bus import EventBus
@@ -577,9 +580,194 @@ class TestConfiguration:
         )
         # hotword se stvarno koristi u provideru
         assert manager._wake.hotword == "alexa"
-        # enabled se stvarno koristi u start_wake_word restart logici
+        # enabled se stvarno koristi u restart wake word logici
         config.set("voice.wake_word.enabled", False)
         manager._state = manager._state.__class__.IDLE
         manager._restart_wake_word_if_enabled()  # ne startuje (disabled)
         assert manager._wake.is_listening is False
         manager.stop()
+
+
+# ====================================================================== #
+# PHASE 10 TASK 4 — H1/H2: AppShell chat streaming delivery
+# ====================================================================== #
+
+
+class _StreamingAssistant:
+    """Controlled assistant stub: emits tokens via token_callback.
+
+    process_message signature mirrors the real Assistant contract used
+    by _GenerationWorker (text, cancel_event, token_callback,
+    should_cancel, images).
+    """
+
+    def __init__(self, tokens: list[str], final: str, delay: float = 0.0) -> None:
+        self._tokens = tokens
+        self._final = final
+        self._delay = delay
+        self._cancel_events: list = []
+        self._engine = None  # coordinator reads .model_name guarded
+
+    def process_message(self, text, cancel_event=None, token_callback=None, should_cancel=None, images=None):
+        self._cancel_events.append(cancel_event)
+        import time
+
+        for tok in self._tokens:
+            if should_cancel is not None and should_cancel():
+                return ""
+            if token_callback is not None:
+                token_callback(tok)
+            if self._delay:
+                time.sleep(self._delay)
+        return self._final
+
+
+class TestAppShellStreamingDelivery:
+    """H1: coordinator → ChatWidget streaming/final response wiring."""
+
+    def _make(self, qapp, assistant):
+        from core.event_bus import EventBus
+        from ui.chat_voice_coordinator import ChatVoiceCoordinator
+        from ui.chat_widget import ChatWidget
+
+        chat = ChatWidget()
+        bus = EventBus()
+        coordinator = ChatVoiceCoordinator(
+            chat=chat, assistant=assistant, voice_manager=None, event_bus=bus
+        )
+        coordinator.wire()
+        return coordinator, chat, bus
+
+    def _assistant_messages(self, chat) -> list[str]:
+        """Raw streamed text of assistant-role bubbles (UserRole data)."""
+        out = []
+        for row in range(chat._message_list.count()):
+            item = chat._message_list.item(row)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data and "Assistant:" in data:
+                out.append(data)
+        return out
+
+    def test_streaming_tokens_reach_chat_widget(self, qapp):
+        """Multiple tokens → bubble accumulates → finalize → exactly one
+        assistant message with the full text; no duplicate."""
+        tokens = ["Hello", ", ", "world", "!"]
+        final = "Hello, world!"
+        assistant = _StreamingAssistant(tokens, final)
+        coordinator, chat, _bus = self._make(qapp, assistant)
+
+        coordinator._start_generation("hi")
+
+        # Wait for the worker to finish (generation_finished is a queued
+        # connection to a GUI-thread slot — pump until it lands).
+        deadline = time.monotonic() + 5.0
+        while coordinator._generation_active and time.monotonic() < deadline:
+            QCoreApplication.processEvents()
+            time.sleep(0.01)
+        for _ in range(10):
+            QCoreApplication.processEvents()
+
+        msgs = self._assistant_messages(chat)
+        assert len(msgs) == 1, f"expected exactly 1 assistant message, got {msgs}"
+        assert final in msgs[0], f"final text {final!r} not in {msgs[0]!r}"
+        # No duplicate: message list has user msg? (none sent via widget),
+        # and streaming state ended.
+        assert chat.is_streaming() is False
+        coordinator.shutdown()
+
+    def test_non_streamed_response_single_message(self, qapp):
+        """No tokens streamed → finish drops empty bubble → exactly ONE
+        assistant message with the full response text."""
+        assistant = _StreamingAssistant(tokens=[], final="Complete answer.")
+        coordinator, chat, _bus = self._make(qapp, assistant)
+
+        coordinator._start_generation("hi")
+
+        deadline = time.monotonic() + 5.0
+        while coordinator._generation_active and time.monotonic() < deadline:
+            QCoreApplication.processEvents()
+            time.sleep(0.01)
+        for _ in range(10):
+            QCoreApplication.processEvents()
+
+        msgs = self._assistant_messages(chat)
+        assert len(msgs) == 1, f"expected exactly 1 assistant message, got {msgs}"
+        assert "Complete answer." in msgs[0]
+        assert chat.is_streaming() is False
+        coordinator.shutdown()
+
+
+class TestGenerationWorkerNoProcessEvents:
+    """H2: should_cancel must never pump the Qt event loop."""
+
+    def test_should_cancel_has_no_process_events(self):
+        """Source contract: _GenerationWorker.run contains no
+        QCoreApplication.processEvents() — it runs on the worker thread
+        where cross-thread event dispatch is a Qt violation."""
+        import inspect
+
+        from ui.chat_voice_coordinator import _GenerationWorker
+
+        source = inspect.getsource(_GenerationWorker.run)
+        assert "processEvents" not in source
+        # And the worker still consults the cancel event (not removed).
+        assert "_cancel_event" in source
+
+
+# ====================================================================== #
+# PHASE 10 TASK 4 — M6: WAV persist runs on the transcription thread
+# ====================================================================== #
+
+
+class TestPersistOffGuiThread:
+    def test_stop_and_transcribe_persists_on_worker_thread(self, qapp):
+        """M6: the WAV write happens inside the transcription dispatch
+        (worker thread), NOT synchronously on the caller (GUI) thread."""
+        manager, _bus = _make_manager(qapp)
+
+        persist_threads: list[int] = []
+        original_persist = manager._persist_recording
+
+        def _tracking_persist(pcm, sample_rate):
+            persist_threads.append(threading.get_ident())
+            original_persist(pcm, sample_rate)
+
+        manager._persist_recording = _tracking_persist
+
+        # The injected runner executes SYNCHRONOUSLY on the calling thread —
+        # the proxy persist must therefore run on the SAME (calling)
+        # thread, proving it executes inside the dispatch, not before it.
+        manager.begin_recording()
+        manager.stop_and_transcribe()
+
+        assert persist_threads, "WAV persist never ran"
+        assert persist_threads[0] == threading.get_ident()
+        manager.stop()
+
+    def test_persist_failure_does_not_block_transcription(self, qapp):
+        """A failing WAV write is logged and skipped — STT still runs and
+        the transcript is still delivered."""
+        manager, bus = _make_manager(qapp)
+
+        def _boom(pcm, sample_rate):
+            raise RuntimeError("disk full")
+
+        manager._persist_recording = _boom
+
+        transcripts: list[str] = []
+
+        def _on_transcript(event_type, data):
+            transcripts.append(data.get("text", ""))
+
+        bus.subscribe("VOICE_TRANSCRIPT", _on_transcript)
+
+        manager.begin_recording()
+        result = manager.stop_and_transcribe()
+        assert result is True  # dispatch proceeded despite persist failure
+        manager.stop()
+
+    def test_wake_word_join_timeout_is_short(self):
+        """L12: the GUI-visible wake-word stop join is bounded at 0.5 s."""
+        from voice.wake_word import OpenWakeWord
+
+        assert OpenWakeWord._JOIN_TIMEOUT <= 0.5

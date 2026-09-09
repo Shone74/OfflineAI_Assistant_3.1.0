@@ -3,6 +3,12 @@
 Defines install profiles (Basic / Standard / Advanced), default
 paths, and profile-to-model mapping so the installer can pre-
 select options based on the user's hardware.
+
+PHASE 6 note: ``models_dir`` here is only an InstallConfig default
+suggestion derived from the application user-data policy.  The
+canonical, user-selected model storage root is the application
+setting ``models.storage_root`` (see ``core.paths``); nothing in this
+module owns or persists a competing model-path source of truth.
 """
 
 from __future__ import annotations
@@ -72,6 +78,14 @@ _PROFILE_DEFAULTS: dict[InstallProfile, dict] = {
 DEFAULT_INSTALL_DIR = Path(r"C:\Program Files\OfflineAI")
 DEFAULT_USER_DATA_DIR = Path.home() / "AppData" / "Local" / "OfflineAI"
 
+#: PHASE 3/6: the default models root is derived from the application
+#: user-data policy (user-writable, NOT Program Files, NOT the install
+#: directory).  The canonical, user-selected models root remains the
+#: application setting ``models.storage_root`` (core.paths.set_models_root
+#: / get_models_root); this value is only the InstallConfig default
+#: suggestion and is never persisted as a competing source of truth.
+DEFAULT_MODELS_DIR = DEFAULT_USER_DATA_DIR / "models"
+
 
 def default_config(profile: InstallProfile = InstallProfile.STANDARD) -> InstallConfig:
     """Return a default InstallConfig for the given profile."""
@@ -79,7 +93,7 @@ def default_config(profile: InstallProfile = InstallProfile.STANDARD) -> Install
     return InstallConfig(
         profile=profile,
         install_dir=DEFAULT_INSTALL_DIR,
-        models_dir=DEFAULT_INSTALL_DIR / "models",
+        models_dir=DEFAULT_MODELS_DIR,
         config_dir=DEFAULT_USER_DATA_DIR / "config",
         logs_dir=DEFAULT_USER_DATA_DIR / "logs",
         data_dir=DEFAULT_USER_DATA_DIR / "data",

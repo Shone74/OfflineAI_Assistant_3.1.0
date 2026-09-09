@@ -60,25 +60,29 @@ def _build_metadata() -> ToolMetadata:
 
 
 def _query_gpu() -> str:
-    """Best-effort GPU detection via WMI. Returns a short label or 'N/A'."""
+    """Best-effort GPU label through the PHASE 7 hardware abstraction.
+
+    Consumes :class:`ai.hardware.HardwareSnapshot` (which sources VRAM
+    from the Phase 4 NVML probe — WMI ``AdapterRAM`` is never trusted
+    for sizing).  Returns a short label or 'N/A'; never raises and
+    never blocks on optional dependencies.
+    """
     global _GPU_QUERY_ATTEMPTED
     if _GPU_QUERY_ATTEMPTED:
         return "N/A"
     try:
-        import wmi
+        from ai.hardware import detect_hardware_snapshot
 
-        w = wmi.WMI()
-        gpus = w.query("SELECT Name, AdapterRAM FROM Win32_VideoController")
-        for gpu in gpus:
-            name = gpu.Name
-            ram_mb = getattr(gpu, "AdapterRAM", 0)
-            ram_mb = ram_mb / (1024 * 1024) if ram_mb else 0
-            return f"{name} ({ram_mb:.0f} MB)" if ram_mb else name
+        snapshot = detect_hardware_snapshot()
+        if snapshot.gpu_name:
+            if snapshot.vram_known:
+                return f"{snapshot.gpu_name} ({snapshot.vram_bytes / (1024**2):.0f} MB)"
+            return snapshot.gpu_name
+        return "N/A"
     except Exception:
         return "N/A"
     finally:
         _GPU_QUERY_ATTEMPTED = True
-    return "N/A"
 
 
 class SystemMonitorTool(Tool):

@@ -39,7 +39,7 @@ from PySide6.QtWidgets import (
 from ai.models.model_manager import ModelManager
 from core.event_bus import EventBus
 from core.logger import get_logger
-from core.paths import MODELS_DIR
+from core.paths import get_models_root
 from installer.hardware import (
     HardwareProfile,
     ModelRecommendation,
@@ -778,10 +778,16 @@ class LocationsPage(QWizardPage):
             self._models_path_edit.setText(directory)
 
     def initializePage(self) -> None:
+        # PHASE 3: the suggested models location is the CURRENT configured
+        # models root (user-data default when unset) — the user may pick any
+        # other location via Browse.  Never a fixed developer path, never
+        # Program Files, never CWD-dependent.
+        from core.paths import get_models_root
+
         app_dir = str(
             Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "Offline AI Assistant"
         )
-        models_dir = str(MODELS_DIR)
+        models_dir = str(get_models_root())
         self._app_path_edit.setText(app_dir)
         self._models_path_edit.setText(models_dir)
         self._update_storage_info()
@@ -846,7 +852,9 @@ class SummaryPage(QWizardPage):
             else "C:\\Program Files\\Offline AI Assistant"
         )
         models_loc = (
-            getattr(wizard, "_models_location", str(MODELS_DIR)) if wizard else str(MODELS_DIR)
+            getattr(wizard, "_models_location", str(get_models_root()))
+            if wizard
+            else str(get_models_root())
         )
 
         self._clear_dynamic_widgets()
@@ -1247,7 +1255,9 @@ class InstallationPage(QWizardPage):
             getattr(wizard, "_selected_model_name", "Qwen 2.5 7B") if wizard else "Qwen 2.5 7B"
         )
         models_loc = (
-            getattr(wizard, "_models_location", str(MODELS_DIR)) if wizard else str(MODELS_DIR)
+            getattr(wizard, "_models_location", str(get_models_root()))
+            if wizard
+            else str(get_models_root())
         )
         self._selected_model_name = selected_model
         self._models_location = models_loc
@@ -1294,10 +1304,10 @@ class InstallationPage(QWizardPage):
 
     def _real_step_app(self) -> str:
         """Phase 1: check that application folders exist (runtime locations)."""
-        from core.paths import CONFIG_DIR, DATA_DIR, LOGS_DIR, MODELS_DIR
+        from core.paths import ensure_dirs, ensure_model_dirs
 
-        for path in (CONFIG_DIR, DATA_DIR, LOGS_DIR, MODELS_DIR):
-            path.mkdir(parents=True, exist_ok=True)
+        ensure_dirs()
+        ensure_model_dirs()
         return "Application folders ready (config, data, logs, models)"
 
     def _real_step_dependencies(self) -> str:
@@ -1360,8 +1370,23 @@ class InstallationPage(QWizardPage):
             return f"Verification: {exc}"
 
     def _real_step_finalize(self) -> str:
-        """Phase 5: config checks (first_run, search paths)."""
+        """Phase 5: persist the user's model location + config checks."""
         notes = []
+        wizard = self.wizard()
+        models_loc = getattr(self, "_models_location", None) or (
+            getattr(wizard, "_models_location", None) if wizard else None
+        )
+        if models_loc:
+            try:
+                from core.config_manager import ConfigManager
+                from core.paths import ensure_model_dirs, set_models_root
+
+                config = ConfigManager()
+                root = set_models_root(models_loc, config=config)
+                ensure_model_dirs()
+                notes.append(f"models root persisted: {root}")
+            except (ValueError, OSError) as exc:
+                notes.append(f"models root rejected: {exc}")
         try:
             from core.config_manager import ConfigManager
 
@@ -1545,7 +1570,7 @@ class CompletePage(QWizardPage):
         self.setTitle("Installation Complete")
         self._selected_model_name = "Qwen 2.5 7B — Q4_K_M"
         self._app_location = "C:\\Program Files\\Offline AI Assistant"
-        self._models_location = str(MODELS_DIR)
+        self._models_location = str(get_models_root())
 
         self._layout = QVBoxLayout(self)
 

@@ -10,11 +10,13 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
 from core.logger import get_logger
-from core.paths import LLM_DIR, SETTINGS_FILE
+from core.paths import SETTINGS_FILE, get_model_category_dir
 
 logger = get_logger("config")
 
@@ -34,8 +36,21 @@ _DEFAULTS: dict[str, Any] = {
         "n_threads": 4,
         "n_gpu_layers": 0,
         "auto_gpu_layers": True,
-        "models_dir": str(LLM_DIR),
-        "model_search_paths": [str(LLM_DIR)],
+        # PHASE 4: canonical GPU execution mode —
+        #   "auto" (detect + safe strategy) | "cpu" (force CPU) | "gpu"
+        #   (prefer GPU, degrade safely).  A non-zero ai.n_gpu_layers
+        #   remains an expert override honoured by the runtime's
+        #   centralized decision point (validated, never bypassing hard
+        #   limits such as a CPU-only llama.cpp build).
+        "gpu_mode": "auto",
+        # Legacy keys kept for backward compatibility (PHASE 3): empty means
+        # "derive from the canonical models.storage_root via core.paths".
+        # The runtime (app.application) resolves empty values dynamically —
+        # these static defaults are only the last-resort suggestion and are
+        # computed from the deterministic user-data root, never a fixed
+        # machine path.
+        "models_dir": str(get_model_category_dir("llm")),
+        "model_search_paths": [str(get_model_category_dir("llm"))],
         "ollama_models_dir": "",
         "max_tokens": 512,
         "temperature": 0.7,
@@ -47,6 +62,14 @@ _DEFAULTS: dict[str, Any] = {
             "max_tokens": 256,
             "temperature": 0.1,
         },
+    },
+    # PHASE 3: user-selected model storage root (canonical key).  Empty
+    # string means "not configured yet" — the runtime then uses the
+    # deterministic default suggestion (user-data models dir) or the legacy
+    # ai.models_dir value.  Written by the welcome wizard / Settings UI via
+    # core.paths.set_models_root(); never a relative path.
+    "models": {
+        "storage_root": "",
     },
     "memory": {
         "short_term_window": 10,
@@ -134,12 +157,50 @@ _DEFAULTS: dict[str, Any] = {
 
 
 class ConfigManager:
-    """Load, validate, and persist application settings."""
+    """Load, validate, and persist application settings.
+
+    ``set()`` uses a short write-coalescing window: the FIRST write in a
+    burst persists immediately (single-write callers — wizard finalize,
+    critical keys — never lose durability), while writes that follow
+    within ``_WRITE_COALESCE_SECONDS`` only mark the config dirty and one
+    trailing flush persists the final state.  This keeps slider/spinner
+    ``valueChanged`` bursts from doing a full JSON serialization + atomic
+    rename PER TICK without changing any observable persistence contract
+    (the flush window is well under any UI action cadence and any later
+    read goes through the in-memory ``_data`` anyway).
+    """
+
+    _WRITE_COALESCE_SECONDS = 1.0
 
     def __init__(self, settings_path: Path | None = None) -> None:
         self.settings_path = settings_path or SETTINGS_FILE
         self._data: dict[str, Any] = {}
+        # M9: write-coalescing state (guarded by _write_lock; the flush
+        # runs on a daemon timer thread so it is safe from any caller
+        # thread, including non-GUI workers).
+        self._write_lock = threading.Lock()
+        self._last_write_ts = 0.0
+        self._dirty = False
         self._load()
+
+    # ------------------------------------------------------------------ #
+    def _flush_if_dirty(self) -> None:
+        """Persist pending coalesced writes (called by the flush timer)."""
+        with self._write_lock:
+            if not self._dirty:
+                return
+            self._dirty = False
+        self.save()
+
+    def _schedule_flush(self) -> None:
+        """Schedule the single trailing save after a coalesced burst."""
+        timer = threading.Timer(
+            self._WRITE_COALESCE_SECONDS, self._flush_if_dirty
+        )
+        timer.daemon = True
+        timer.start()
+
+    # ------------------------------------------------------------------ #
 
     # ------------------------------------------------------------------ #
     def _load(self) -> None:
@@ -204,15 +265,38 @@ class ConfigManager:
         return current
 
     def set(self, key: str, value: Any) -> None:
-        """Set a dot-separated key and persist immediately."""
+        """Set a dot-separated key and persist (write-coalesced).
+
+        First write in a burst window persists immediately; rapid follow-up
+        writes (slider/spinner valueChanged ticks) coalesce into one
+        trailing flush so disk I/O stays O(1) per burst instead of O(n)
+        per tick.  The in-memory value is ALWAYS updated synchronously —
+        later ``get()`` calls observe it regardless of flush state.
+        """
         parts = key.split(".")
-        current = self._data
+        current: Any = self._data
         for part in parts[:-1]:
             current = current.setdefault(part, {})
         old_value = current.get(parts[-1])
         current[parts[-1]] = value
         try:
-            self.save()
+            with self._write_lock:
+                now = time.monotonic()
+                if now - self._last_write_ts >= self._WRITE_COALESCE_SECONDS:
+                    # First write in a burst — persist now (durability for
+                    # single-write callers).
+                    self._last_write_ts = now
+                    self._dirty = False
+                    persist_now = True
+                else:
+                    # Inside a burst — coalesce; one trailing flush saves.
+                    self._last_write_ts = now
+                    self._dirty = True
+                    persist_now = False
+            if persist_now:
+                self.save()
+            else:
+                self._schedule_flush()
         except OSError:
             current[parts[-1]] = old_value
             raise

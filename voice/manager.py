@@ -27,7 +27,7 @@ from PySide6.QtCore import QThread, Signal
 
 from core.event_bus import EventBus
 from core.logger import get_logger
-from core.paths import DATA_DIR, STT_DIR
+from core.paths import DATA_DIR, get_model_category_dir
 from voice.audio import AudioCaptureError, AudioConfig, AudioManager, create_audio
 from voice.base import STTProvider, TTSProvider, WakeWordProvider
 from voice.stt import STTModelError, _whisper_available, create_stt
@@ -130,6 +130,33 @@ class _VoiceSpeakWorker(QThread):
         if self.isInterruptionRequested():
             return
         self.finished.emit()
+
+
+class _PersistingSTTProxy:
+    """STT provider wrapper that persists the WAV before transcribing.
+
+    M6: the WAV write (proportional to the recording length) executes on
+    the transcription worker thread right before STT, instead of on the
+    GUI thread.  The wrapped provider's STT behaviour is unchanged; a
+    persist failure never blocks transcription (it is logged and
+    skipped, exactly as before).
+    """
+
+    __slots__ = ("_manager", "_stt")
+
+    def __init__(self, manager: VoiceManager, stt: STTProvider) -> None:
+        self._manager = manager
+        self._stt = stt
+
+    def transcribe(self, pcm: bytes, sample_rate: int = 16000, **kwargs) -> str:
+        try:
+            self._manager._persist_recording(pcm, sample_rate)
+        except Exception:
+            logger.debug("failed to persist last recording", exc_info=True)
+        return self._stt.transcribe(pcm, sample_rate=sample_rate, **kwargs)
+
+    def __getattr__(self, name):  # transparent pass-through for other attrs
+        return getattr(self._stt, name)
 
 
 class VoiceManager:
@@ -465,7 +492,7 @@ class VoiceManager:
                 model_name=cfg["model"],
                 device=cfg["device"],
                 language=cfg["language"],
-                stt_dir=STT_DIR,
+                stt_dir=get_model_category_dir("stt"),
             )
 
             # Pre-validate: if WhisperSTT, check that the model directory exists
@@ -475,7 +502,8 @@ class VoiceManager:
                 if not model_path.is_dir():
                     raise STTModelError(
                         f"Whisper model '{new_stt._model_name}' not found in "
-                        f"'{new_stt._stt_dir}'. Place model folders under STT_DIR."
+                        f"'{new_stt._stt_dir}'. Place model folders under the "
+                        f"stt category dir of the configured models root."
                     )
 
             # New provider validated — stop old, swap in new.
@@ -679,15 +707,16 @@ class VoiceManager:
         """
         if stt_cfg["provider"] != "faster-whisper" or not _whisper_available():
             return
+        stt_dir = get_model_category_dir("stt")
         model_name = stt_cfg["model"]
-        model_path = STT_DIR / model_name
+        model_path = stt_dir / model_name
         if not model_path.is_dir():
             try:
                 self._pending_startup_errors.append(
                     {
                         "error": (
                             f"Whisper model '{model_name}' not found in the "
-                            f"local model directory '{STT_DIR}'. The application "
+                            f"local model directory '{stt_dir}'. The application "
                             "runs fully offline; faster-whisper will not download "
                             "a model automatically."
                         )
@@ -778,6 +807,13 @@ class VoiceManager:
         Returns ``False`` (and publishes ``VOICE_ERROR``) if stopping the
         stream fails. The transcript is delivered asynchronously via
         ``VOICE_TRANSCRIPT`` on the main thread once the worker finishes.
+
+        M6: the WAV persistence (a disk write proportional to the
+        recording length) runs INSIDE the transcription worker thread —
+        it is attached to the STT provider proxy, so whichever runner
+        executes the transcription (default QThread worker or an
+        injected test runner) performs the persist on its own thread,
+        never on the GUI thread.
         """
         if self._state != VoiceState.RECORDING:
             return False
@@ -792,11 +828,12 @@ class VoiceManager:
         except Exception as exc:
             self._publish_voice_error(f"failed to stop recording: {exc}")
             return False
-        try:
-            self._persist_recording(pcm, sr)
-        except Exception:
-            logger.debug("failed to persist last recording", exc_info=True)
-        self._run_transcription(pcm, sr, self._on_transcription_result, self._on_transcription_error)
+        stt = _PersistingSTTProxy(self, self._stt)
+        self._run_transcription(
+            pcm, sr,
+            self._on_transcription_result, self._on_transcription_error,
+            stt=stt,
+        )
         return True
 
     # ------------------------------------------------------------------ #
@@ -880,15 +917,18 @@ class VoiceManager:
         sample_rate: int,
         on_done: TranscriptionCallback,
         on_error: TranscriptionErrorHandler,
+        stt: STTProvider | None = None,
     ) -> None:
         """Dispatch ``pcm`` to the STT provider via the configured runner.
 
         The default runner spawns a :class:`_VoiceTranscribeWorker` (QThread).
         Tests inject a synchronous runner so results can be asserted without a
-        Qt event loop.
+        Qt event loop.  *stt* overrides the provider for this dispatch (used
+        to attach the persist proxy without rebinding manager state).
         """
+        provider = stt if stt is not None else self._stt
         runner = self._transcription_runner or self._default_transcribe_worker
-        runner(self._stt, pcm, sample_rate, on_done, on_error)
+        runner(provider, pcm, sample_rate, on_done, on_error)
 
     def _default_transcribe_worker(
         self,

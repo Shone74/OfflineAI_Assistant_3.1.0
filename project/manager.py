@@ -3,16 +3,36 @@
 These managers provide CRUD operations for project and workspace entities,
 with persistence through the existing database layer.
 
+Filesystem Security (Phase 2):
+    Every operation that touches user/project files goes through the shared
+    :class:`tools.file_security.PathValidator` (the same security boundary
+    used by the file tools and configured from ``filesystem.*`` settings):
+
+    * ``create_project`` — workspace path must pass WRITE authorization
+      before anything is persisted or created on disk.
+    * ``validate_workspace_path`` — enforces the security boundary in
+      addition to basic existence checks, distinguishing an unauthorized
+      path (:class:`PathValidationError`) from an invalid/nonexistent one
+      (:class:`ValueError`).
+    * ``list_project_files`` — recursive enumeration enforces READ
+      authorization on the workspace root AND on every enumerated entry,
+      never descending into symlink/reparse-point directories, so a
+      symlinked escape cannot leak paths outside the allowed read roots.
+    * ``delete_workspace_files`` — the ONLY sanctioned workspace deletion
+      path; requires WRITE authorization before the destructive
+      ``shutil.rmtree`` runs (note: rmtree does not follow junction
+      targets, but the authorization decision is still enforced first).
+
 Profile Override Support:
     Each workspace and project can have an optional profile_override dict
     that modifies the assistant profile when that context is active.
 
-Profile Override Format:
-    {
-        "identity": {"name": "Project-Specific Assistant"},
-        "personality": {"humor": 0.8},
-        ...
-    }
+    Profile Override Format:
+        {
+            "identity": {"name": "Project-Specific Assistant"},
+            "personality": {"humor": 0.8},
+            ...
+        }
 
     Stored as JSON in the database, loaded on workspace/project access.
 """
@@ -20,12 +40,18 @@ Profile Override Format:
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from core.event_bus import EventBus
 from core.logger import get_logger
 from project.models import Project, Workspace
+from tools.file_security import (
+    PathValidationError,
+    PathValidator,
+    get_default_validator,
+)
 
 if TYPE_CHECKING:
     from database.database_manager import DatabaseManager
@@ -198,16 +224,27 @@ class ProjectManager:
     when the project is accessed.
     """
 
-    def __init__(self, db: DatabaseManager | None = None, event_bus: EventBus | None = None) -> None:
+    def __init__(self, db: DatabaseManager | None = None, event_bus: EventBus | None = None, validator: PathValidator | None = None) -> None:
         """Initialize project manager.
 
         Args:
             db: Optional database manager for persistence.
             event_bus: Optional event bus for publishing events.
+            validator: Optional filesystem security validator.  Defaults to
+                the shared module-level validator (``get_default_validator``)
+                resolved lazily on each use, so configuration changes made
+                after manager construction are always honoured.  The manager
+                must never implement its own filesystem policy.
         """
         self._db = db
         self._event_bus = event_bus
+        self._validator_override = validator
         self._cache: dict[str, Project] = {}
+
+    @property
+    def _security(self) -> PathValidator:
+        """The filesystem security boundary (shared validator by default)."""
+        return self._validator_override or get_default_validator()
 
     def create_project(
         self,
@@ -404,9 +441,12 @@ class ProjectManager:
         return self.list_projects(workspace_id=workspace_id)
 
     def validate_workspace_path(self, path: str) -> str:
-        """Validate that *path* is a usable workspace directory.
+        """Validate that *path* is a usable, authorized workspace directory.
 
-        The path must exist and be a directory. Symlinks are resolved.
+        Enforces the shared filesystem security boundary in addition to
+        basic filesystem checks.  Relative paths are rejected: they have no
+        deterministic security meaning (resolving them against the process
+        CWD would make authorization CWD-dependent).
 
         Args:
             path: Filesystem path to validate.
@@ -415,11 +455,27 @@ class ProjectManager:
             Resolved absolute path string.
 
         Raises:
-            ValueError: If the path does not exist or is not a directory.
+            PathValidationError: If the path fails filesystem-security
+                authorization (outside allowed write roots, policy
+                fail-closed, traversal, symlink escape, ...).  This is
+                raised BEFORE any existence check so an unauthorized path
+                is never accepted even if it happens to exist.
+            ValueError: If the path is empty, relative, does not exist,
+                or is not a directory (invalid input, not a security
+                decision).
         """
         if not path or not path.strip():
             raise ValueError("Workspace path must not be empty")
-        resolved = Path(path).resolve()
+        raw = Path(path)
+        if not raw.is_absolute():
+            raise ValueError(
+                f"Workspace path must be absolute; relative paths are not "
+                f"deterministic and are rejected: {path}"
+            )
+        # Security boundary first — an unauthorized path must be reported
+        # as an authorization failure even when the target exists.
+        self._security.validate_write(path)
+        resolved = raw.resolve()
         if not resolved.exists():
             raise ValueError(f"Workspace path does not exist: {resolved}")
         if not resolved.is_dir():
@@ -455,12 +511,22 @@ class ProjectManager:
     def list_project_files(self, project_id: str, include_hidden: bool = False) -> list[str]:
         """List actual files in the project's workspace directory.
 
+        Security (Phase 2): the workspace root must pass READ authorization
+        and every enumerated entry is containment-checked against the same
+        boundary.  The walk is manual (not ``rglob``) and NEVER descends
+        into symlink/reparse-point directories — a link inside the tree
+        cannot leak paths outside the allowed read roots.  Broken symlinks
+        and permission errors are skipped safely; a failing entry never
+        crashes the whole listing nor silently broadens access.
+
         Args:
             project_id: The project whose files to list.
             include_hidden: Whether to include hidden files (starting with '.').
 
         Returns:
-            List of relative file paths within the workspace.
+            List of relative file paths within the workspace.  Empty when the
+            project has no workspace, the workspace is unauthorized, or the
+            root is missing.
         """
         proj = self.get_project(project_id)
         if proj is None or not proj.workspace_path:
@@ -468,11 +534,104 @@ class ProjectManager:
         ws = Path(proj.workspace_path)
         if not ws.exists() or not ws.is_dir():
             return []
+
+        # Read authorization on the workspace root itself.  A failure here
+        # means the workspace location is outside the allowed read boundary
+        # (or the policy is fail-closed): return nothing rather than leak.
+        try:
+            self._security.validate_read(str(ws))
+        except PathValidationError as exc:
+            logger.warning(
+                "Refused to enumerate workspace of project %s — read "
+                "authorization failed for %s: %s", project_id, ws, exc,
+            )
+            return []
+
         files: list[str] = []
-        for p in ws.rglob("*"):
-            if p.is_file():
-                rel = p.relative_to(ws).as_posix()
-                if not include_hidden and any(part.startswith(".") for part in p.relative_to(ws).parts):
+        # Explicit stack-based walk.  os.scandir-based iteration keeps
+        # is_symlink() decisions cheap; directory symlinks are recorded but
+        # never entered.
+        stack: list[Path] = [ws]
+        while stack:
+            current = stack.pop()
+            try:
+                entries = sorted(current.iterdir())
+            except OSError as exc:
+                logger.debug("Cannot list %s: %s", current, exc)
+                continue
+            for entry in entries:
+                try:
+                    if entry.is_symlink():
+                        # Never descend into a symlinked directory and never
+                        # report files reached through it.  If the target is
+                        # an authorized location the user can add it as its
+                        # own root; links must not broaden access.
+                        continue
+                    if entry.is_dir():
+                        stack.append(entry)
+                        continue
+                    if not entry.is_file():
+                        continue
+                    resolved = entry.resolve(strict=False)
+                    if not self._security.is_path_authorized(str(resolved), action="read"):
+                        logger.debug(
+                            "Skipping unauthorized file during enumeration: %s", resolved
+                        )
+                        continue
+                    rel = entry.relative_to(ws).as_posix()
+                    if not include_hidden and any(
+                        part.startswith(".") for part in entry.relative_to(ws).parts
+                    ):
+                        continue
+                    files.append(rel)
+                except OSError as exc:
+                    logger.debug("Skipping %s during enumeration: %s", entry, exc)
                     continue
-                files.append(rel)
         return sorted(files)
+
+    def delete_workspace_files(self, project_id: str) -> bool:
+        """Recursively delete the project's workspace directory contents.
+
+        The ONLY sanctioned workspace deletion path (the UI must route
+        "also delete files" here instead of calling ``shutil.rmtree``
+        itself).  The workspace root must pass WRITE authorization before
+        any destructive operation runs.  ``shutil.rmtree`` itself does not
+        follow junction/symlink targets, so the authorized tree cannot
+        delete content through a link into another location — but the
+        authorization decision is still enforced first.
+
+        Args:
+            project_id: The project whose workspace files to delete.
+
+        Returns:
+            True if the workspace directory was removed, False when there
+            is nothing to remove.  Raises :class:`PathValidationError` when
+            the workspace location is not write-authorized — BEFORE any
+            deletion is attempted.
+        """
+        proj = self.get_project(project_id)
+        if proj is None or not proj.workspace_path:
+            return False
+        ws = Path(proj.workspace_path)
+        if not ws.exists():
+            return False
+        if not ws.is_dir():
+            raise ValueError(f"Workspace path is not a directory: {ws}")
+
+        # WRITE authorization before any destructive operation.
+        self._security.validate_write(str(ws))
+
+        # Defense in depth: the resolved workspace must still be inside an
+        # authorized write root even if it was reached via a symlink.
+        if not self._security.is_path_authorized(str(ws.resolve(strict=False)), action="write"):
+            raise PathValidationError(
+                f"Workspace path resolves outside allowed write roots: {ws}"
+            )
+
+        try:
+            shutil.rmtree(ws)
+        except OSError as exc:
+            logger.error("Failed to delete workspace %s: %s", ws, exc)
+            raise
+        logger.info("Deleted project workspace files: %s", ws)
+        return True

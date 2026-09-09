@@ -1,10 +1,12 @@
 """Speech-to-text providers with a stub fallback.
 
 Real backend: :class:`WhisperSTT`, backed by ``faster-whisper`` + ``ctranslate2``.
-The Whisper model is resolved to a LOCAL directory under
-``core.paths.STT_DIR`` (``models/voice/stt/<model>``). If the directory is
-absent, transcription raises :class:`STTModelError` — the provider never
-downloads a model automatically and never fabricates a transcript.
+The Whisper model is resolved to a LOCAL directory under the stt category
+dir of the configured models root (``<models_root>/stt/<model>`` — the
+legacy ``<models_root>/voice/stt`` layout is honoured when it exists). If
+the directory is absent, transcription raises :class:`STTModelError` — the
+provider never downloads a model automatically and never fabricates a
+transcript.
 
 The model is loaded lazily on first transcription and cached on the instance, so
 a microphone click does not reload it.
@@ -17,12 +19,22 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from core.paths import STT_DIR
 from voice.base import STTProvider
 
 logger = logging.getLogger("voice")
 
 _TARGET_SAMPLE_RATE = 16000
+
+
+def _default_stt_dir() -> Path:
+    """STT category dir under the configured models root (PHASE 3).
+
+    Resolved at call time so configuration changes are honoured; keeps the
+    legacy ``voice/stt`` sublayout working when it already exists.
+    """
+    from core.paths import get_model_category_dir
+
+    return get_model_category_dir("stt")
 
 
 class STTModelError(Exception):
@@ -86,12 +98,12 @@ class WhisperSTT(STTProvider):
         model_name: str = "tiny",
         device: str = "auto",
         language: str = "auto",
-        stt_dir: str | Path = STT_DIR,
+        stt_dir: str | Path | None = None,
     ) -> None:
         self._model_name = model_name
         self._device = device
         self._language = language
-        self._stt_dir = Path(stt_dir)
+        self._stt_dir = Path(stt_dir) if stt_dir is not None else _default_stt_dir()
         self._model: Any = None
         self._resolved_device: str | None = None
 
@@ -199,7 +211,7 @@ def create_stt(
     model_name: str = "tiny",
     device: str = "auto",
     language: str = "auto",
-    stt_dir: str | Path = STT_DIR,
+    stt_dir: str | Path | None = None,
 ) -> STTProvider:
     """Return the best available STT provider, falling back to :class:`StubSTT`.
 

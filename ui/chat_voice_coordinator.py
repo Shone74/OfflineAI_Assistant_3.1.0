@@ -48,14 +48,15 @@ class _GenerationWorker(QThread):
 
     def run(self) -> None:
         try:
-            from PySide6.QtCore import QCoreApplication
-
             def on_token(token: str) -> None:
                 if not self.isInterruptionRequested():
                     self.token_emitted.emit(token)
 
             def should_cancel() -> bool:
-                QCoreApplication.processEvents()
+                # Pure cancel-event check ONLY.  This runs on the worker
+                # QThread — never pump the Qt event loop from here (that
+                # would dispatch GUI-thread work cross-thread); queued
+                # signal delivery happens automatically on the GUI side.
                 return bool(self._cancel_event and self._cancel_event.is_set())
 
             response = self._assistant.process_message(
@@ -107,6 +108,7 @@ class ChatVoiceCoordinator(QWidget):
         self._cancel_event: Any = None
         self._sub_ids: list[tuple[str, str]] = []
         self._responded = False  # response shown (start/finish streaming)
+        self._tokens_streamed = False  # any tokens appended this turn
 
         # Automatic Listening state machine (specification §4)
         self._auto_listen = False           # user mode (persistent) while ON
@@ -288,6 +290,7 @@ class ChatVoiceCoordinator(QWidget):
 
         self._generation_active = True
         self._responded = False
+        self._tokens_streamed = False
         self._cancel_event = threading.Event()
         if hasattr(self._assistant, "_cancel_event"):
             self._assistant._cancel_event = self._cancel_event
@@ -306,8 +309,16 @@ class ChatVoiceCoordinator(QWidget):
             self._generation_worker = None
 
     def _on_token(self, token: str) -> None:
+        """GUI-thread slot: stream the token into the chat bubble.
+
+        Mirrors the proven MainWindow handler: start the streaming
+        bubble on the first token, append each token to it, and keep
+        publishing GENERATION_TOKEN for any event-bus consumers.
+        """
         if not self._chat.is_streaming():
             self._chat.start_streaming()
+        self._tokens_streamed = True
+        self._chat.append_streaming_token(token)
         if self._event_bus is not None:
             self._event_bus.publish("GENERATION_TOKEN", data={"token": token})
 
@@ -315,6 +326,15 @@ class ChatVoiceCoordinator(QWidget):
         self._generation_active = False
         self._generation_worker = None
         self._set_online_indicator(False)
+        # Finalize the chat bubble: finish_streaming() keeps the streamed
+        # text when tokens arrived, or drops the empty placeholder when
+        # nothing streamed (non-streaming path below then adds exactly
+        # ONE assistant message with the full response).
+        if self._chat.is_streaming():
+            self._chat.finish_streaming()
+        if response and not self._tokens_streamed:
+            self._chat.add_message("assistant", response)
+        self._tokens_streamed = False
         cid = f"conv-{datetime.now(UTC).isoformat()}"
         model_name = (
             self._assistant._engine.model_name
@@ -349,21 +369,23 @@ class ChatVoiceCoordinator(QWidget):
         self._resume_after_response()
 
     def _maybe_speak(self, text: str) -> None:
-        """TTS if voice is enabled — same condition as MainWindow."""
+        """TTS if voice is enabled — same condition as MainWindow.
+
+        L11: reads the enabled flag through ConfigManager (cached
+        in-memory dict) instead of re-reading and re-parsing
+        settings.json from disk on every response.
+        """
         if (
             self._voice is not None
             and self._event_bus is not None
         ):
             try:
-                import json
-                from pathlib import Path
+                from core.config_manager import ConfigManager
 
-                cfg_path = Path.home() / "AppData" / "Local" / "OfflineAI" / "config" / "settings.json"
-                if cfg_path.exists():
-                    cfg = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
-                    if cfg.get("voice", {}).get("enabled", True):
-                        self._voice.speak(text)
-                        return
+                cfg = ConfigManager()
+                if cfg.get("voice.enabled", True):
+                    self._voice.speak(text)
+                    return
             except Exception:
                 logger.debug("voice config read failed — skipping TTS", exc_info=True)
         self._resume_after_response()

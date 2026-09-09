@@ -13,7 +13,6 @@ from pathlib import Path
 
 from ai.models.discovery import discover_all_models
 from ai.models.model_loader import (
-    LLM_DIR,
     GGUFModelLoader,
     ModelInfo,
     ModelLoader,
@@ -101,7 +100,7 @@ class ModelManager:
 
     def __init__(
         self,
-        models_dir: Path = LLM_DIR,
+        models_dir: Path | None = None,
         search_paths: list[Path] | None = None,
         ollama_models_dir: Path | None = None,
         include_ollama: bool = True,
@@ -110,7 +109,15 @@ class ModelManager:
         n_gpu_layers: int = 0,
         n_ctx: int = 4096,
         auto_gpu_layers: bool = False,
+        gpu_mode: str = "auto",
     ) -> None:
+        # PHASE 3: the default models dir is the llm category dir under the
+        # configured (user-selected) models root — never a static snapshot
+        # and never CWD/developer-machine dependent.
+        if models_dir is None:
+            from core.paths import get_model_category_dir
+
+            models_dir = get_model_category_dir("llm")
         self.models_dir = models_dir
         # Build search paths: include models_dir plus any configured search_paths,
         # deduplicated. This ensures the configured models_dir is always scanned
@@ -129,10 +136,16 @@ class ModelManager:
         self._n_gpu_layers = n_gpu_layers
         self._n_ctx = n_ctx
         self._auto_gpu_layers = auto_gpu_layers
+        self._gpu_mode = gpu_mode
         self._models: list[ModelInfo] = []
         self._active_model: ModelInfo | None = None
         self._loader: ModelLoader | None = None
         self._load_error: str | None = None
+        # H4 discovery cache (see rescan()): inputs signature + shallow
+        # directory fingerprint + cached result.
+        self._last_scan_signature: tuple | None = None
+        self._last_scan_fingerprint: tuple | None = None
+        self._last_scan_models: list[ModelInfo] | None = None
         self._scan()
 
     def set_models_dir(self, models_dir: Path) -> None:
@@ -172,11 +185,100 @@ class ModelManager:
         )
         for m in self._models:
             m.active = False
+        # H4: remember the scan inputs AND a cheap directory fingerprint so
+        # unchanged repeat scans (Models page navigation, refresh clicks)
+        # reuse this result instead of re-walking every directory on the
+        # caller's (GUI) thread.
+        self._last_scan_signature = self._scan_signature()
+        self._last_scan_fingerprint = self._dir_fingerprint()
+        self._last_scan_models = [m for m in self._models]
         logger.info("Scanned %d search path(s) — found %d model(s)",
                      len(self._search_paths), len(self._models))
 
+    def _scan_signature(self) -> tuple:
+        """Fingerprint of the scan INPUT configuration.
+
+        Any change (paths, options, Ollama dir) produces a different
+        signature, forcing a real rescan.
+        """
+        return (
+            tuple(str(p) for p in self._search_paths),
+            bool(self._include_ollama),
+            bool(self._include_lm_studio),
+            str(self._ollama_models_dir) if self._ollama_models_dir else "",
+        )
+
+    def _dir_fingerprint(self) -> tuple:
+        """Cheap directory fingerprint: one SHALLOW ``os.scandir`` of each
+        search path — names, file counts, and mtimes only.
+
+        This costs microseconds even for huge model roots (no recursion,
+        no file opens, no GGUF header parsing), unlike the full
+        discovery walk.  Used by :meth:`rescan` to detect real changes
+        (added/removed/renamed model files) so the expensive recursive
+        discovery only runs when something actually changed.
+        """
+        parts: list = []
+        for path in self._search_paths:
+            try:
+                entries = sorted(os.scandir(path), key=lambda e: e.name)
+                parts.append(
+                    (
+                        str(path),
+                        tuple(
+                            (e.name, int(e.stat(follow_symlinks=False).st_mtime))
+                            for e in entries
+                        ),
+                    )
+                )
+            except OSError:
+                parts.append((str(path), ()))
+        if self._include_ollama:
+            odir = self._ollama_models_dir
+            try:
+                if odir is None:
+                    from ai.models.discovery import _get_ollama_models_dir
+
+                    odir = _get_ollama_models_dir()
+                if odir is not None:
+                    entries = sorted(os.scandir(odir), key=lambda e: e.name)
+                    parts.append(
+                        (
+                            str(odir),
+                            tuple(
+                                (e.name, int(e.stat(follow_symlinks=False).st_mtime))
+                                for e in entries
+                            ),
+                        )
+                    )
+            except OSError:
+                pass
+        return tuple(parts)
+
     def rescan(self) -> list[ModelInfo]:
-        """Re-scan the models directory (call after adding/removing models)."""
+        """Re-scan the models directory (call after adding/removing models).
+
+        H4: the expensive recursive discovery (opens files, parses GGUF
+        headers, walks Ollama/LM Studio trees) runs ONLY when the scan
+        inputs changed OR the cheap shallow directory fingerprint shows
+        the contents changed (file added/removed/renamed/mtime bumped).
+        Otherwise the cached result is returned — Models-page navigation
+        no longer re-walks every directory on the GUI thread.
+        ``rescan_force()`` (the Refresh button) always rescans for real.
+        """
+        if (
+            self._last_scan_models is not None
+            and self._scan_signature() == self._last_scan_signature
+            and self._dir_fingerprint() == self._last_scan_fingerprint
+        ):
+            logger.debug("Discovery cache hit — reusing %d model(s)",
+                         len(self._last_scan_models))
+            return list(self._last_scan_models)
+        self._scan()
+        return list(self._models)
+
+    def rescan_force(self) -> list[ModelInfo]:
+        """Force a full filesystem rescan, bypassing the discovery cache."""
         self._scan()
         return list(self._models)
 
@@ -236,6 +338,7 @@ class ModelManager:
             n_ctx=self._n_ctx,
             auto_gpu_layers=self._auto_gpu_layers,
             mmproj_path=_find_mmproj_for(model),
+            gpu_mode=self._gpu_mode,
         )
         try:
             loader.load(model.path)
@@ -334,6 +437,7 @@ class ModelManager:
                 n_ctx=self._n_ctx,
                 auto_gpu_layers=self._auto_gpu_layers,
                 mmproj_path=mmproj,
+                gpu_mode=self._gpu_mode,
             )
             try:
                 self._loader.load(model.path)
@@ -373,15 +477,32 @@ class ModelManager:
         logger.info("Model unloaded")
 
     # ------------------------------------------------------------------ #
-    def download_model(self, url: str, filename: str, expected_checksum: str | None = None) -> ModelInfo:
-        """Download a model file and add it to the model list."""
+    def download_model(
+        self,
+        url: str,
+        filename: str,
+        expected_checksum: str | None = None,
+        downloader_factory=None,
+    ) -> ModelInfo:
+        """Download a model file and add it to the model list.
+
+        *downloader_factory* (optional) lets the caller — typically the
+        UI download worker — construct the downloader so it can hold a
+        live reference for cooperative cancellation while this method
+        keeps its orchestration (scan + find).  It receives the same
+        keyword arguments this method would pass; omitting it preserves
+        the previous behavior exactly.
+        """
         try:
             from installer.downloader import ModelDownloader
         except ImportError as exc:
             raise ImportError("Installer module not available") from exc
 
         self.models_dir.mkdir(parents=True, exist_ok=True)
-        downloader = ModelDownloader(dest_dir=self.models_dir)
+        if downloader_factory is not None:
+            downloader = downloader_factory(dest_dir=self.models_dir)
+        else:
+            downloader = ModelDownloader(dest_dir=self.models_dir)
         result = downloader.download(url, filename, expected_checksum)
 
         if not result.success:

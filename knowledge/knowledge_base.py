@@ -73,17 +73,70 @@ class KnowledgeBase:
         directory: str | Path,
         patterns: tuple[str, ...] = ("*.md", "*.txt"),
     ) -> int:
-        """Index every file matching *patterns* beneath *directory*."""
+        """Index every file matching *patterns* beneath *directory*.
+
+        PHASE 8 integration rules:
+
+        * The walk is symlink/junction-safe: link directories are never
+          descended into, so indexing cannot escape the authorized
+          knowledge root through a planted link (same contract as the
+          project workspace enumeration).
+        * Temporary downloader artifacts (``*.part``) and hidden files
+          are skipped — a partial download must never enter the index.
+        * Each candidate file still passes the shared filesystem
+          security boundary's READ authorization when the validator is
+          configured; unauthorized files are skipped, not leaked.
+        """
         root = Path(directory)
         total = 0
-        for pattern in patterns:
-            for file_path in root.rglob(pattern):
-                try:
-                    total += self.index_document(file_path)
-                except Exception:
-                    from core.logger import get_logger
+        from core.logger import get_logger
 
-                    get_logger("knowledge").exception("Failed to index %s", file_path)
+        log = get_logger("knowledge")
+
+        try:
+            from tools.file_security import get_default_validator
+
+            validator = get_default_validator()
+        except Exception:
+            validator = None
+
+        # Stack-based, link-safe walk (never follows symlinked dirs).
+        stack: list[Path] = [root]
+        while stack:
+            current = stack.pop()
+            try:
+                entries = sorted(current.iterdir())
+            except OSError as exc:
+                log.debug("Cannot list %s during indexing: %s", current, exc)
+                continue
+            for entry in entries:
+                try:
+                    if entry.is_symlink():
+                        continue  # never descend through links
+                    if entry.is_dir():
+                        stack.append(entry)
+                        continue
+                    if not entry.is_file():
+                        continue
+                    if entry.name.startswith("."):
+                        continue
+                    if entry.suffix.lower() == ".part":
+                        continue  # incomplete downloader artifact
+                    if not any(entry.match(p) for p in patterns):
+                        continue
+                    if validator is not None:
+                        try:
+                            validator.validate_read(str(entry))
+                        except Exception:
+                            log.debug(
+                                "Skipping unauthorized file during indexing: %s",
+                                entry,
+                            )
+                            continue
+                    total += self.index_document(entry)
+                except OSError as exc:
+                    log.debug("Skipping %s during indexing: %s", entry, exc)
+                    continue
         return total
 
     def search(self, query: str, top_k: int = 5) -> list[SearchResult]:

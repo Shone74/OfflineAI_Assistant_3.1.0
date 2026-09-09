@@ -28,12 +28,36 @@ from ai.models.model_loader import (
     infer_capabilities,
 )
 from core.logger import get_logger
-from core.paths import LLM_DIR
+from core.paths import get_model_category_dir
 
 logger = get_logger("discovery")
 
 _GGUF_MAGIC = b"GGUF"
 _MODEL_LAYER_MEDIA_TYPE = "application/vnd.ollama.image.model"
+
+
+def _default_llm_category_dir() -> Path:
+    """LLM category dir under the configured models root (PHASE 3).
+
+    Avoids a static import of core.paths.LLM_DIR (a module-import snapshot)
+    so category resolution always honours the current models root.
+    """
+    return get_model_category_dir("llm")
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    """True when the resolved *path* stays inside the resolved *root*.
+
+    Security guard for recursive discovery: entries reached through
+    symlink/junction directories that escape the scanned root are treated
+    as outside and skipped, so a link inside the model tree cannot leak
+    files from arbitrary locations into discovery results.
+    """
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
 
 
 def _get_ollama_models_dir() -> Path | None:
@@ -79,13 +103,34 @@ def _safe_stat(path: Path) -> int:
 
 
 def discover_local_gguf(directory: Path) -> list[ModelInfo]:
-    """Discover ``.gguf`` files in *directory* (recursive)."""
+    """Discover ``.gguf`` files in *directory* (recursive).
+
+    Security (PHASE 3): recursion never follows symlink/junction escapes —
+    an entry whose resolved path leaves *directory* is skipped, so a link
+    inside the model tree cannot pull in files from outside the scanned
+    root.
+    """
     models: list[ModelInfo] = []
     if not directory.exists():
         return models
 
+    try:
+        scan_root = directory.resolve(strict=False)
+    except (OSError, RuntimeError):
+        scan_root = directory.absolute()
+
     for entry in sorted(directory.rglob("*.gguf")):
         if not entry.is_file():
+            continue
+        try:
+            resolved = entry.resolve(strict=False)
+        except (OSError, RuntimeError):
+            resolved = entry.absolute()
+        if not _is_within(resolved, scan_root):
+            logger.debug(
+                "Skipping GGUF outside scanned root (symlink/junction escape): %s",
+                entry,
+            )
             continue
         size = _safe_stat(entry)
         if size == 0:
@@ -125,8 +170,12 @@ def discover_extensionless_gguf(
     and whose first 4 bytes are ``b"GGUF"``.
 
     *exclude_paths* is a set of resolved paths to skip (used to prevent
-    Ollama blob files from being rediscovered as generic extensionless GGUF
-    when Ollama manifest discovery already covers them).
+    Ollama blob files from being rediscovered as generic extensionless
+    GGUF when Ollama manifest discovery already covers them).
+
+    PHASE 7: incomplete downloader files (``*.part``) are always
+    excluded — a partial download that happens to contain the GGUF
+    magic bytes must never surface as a usable model.
     """
     models: list[ModelInfo] = []
     if not directory.exists():
@@ -145,11 +194,25 @@ def discover_extensionless_gguf(
             continue
         if entry.suffix.lower() in exclude_suffixes:
             continue
+        # PHASE 7: never surface incomplete downloads as models.
+        if entry.suffix.lower() == ".part":
+            continue
         try:
             resolved = entry.resolve()
         except OSError:
             resolved = entry
         if resolved in exclude_resolved:
+            continue
+        # PHASE 3 security: never surface files reached through
+        # symlink/junction escapes out of the scanned root.
+        try:
+            scan_root = directory.resolve(strict=False)
+        except (OSError, RuntimeError):
+            scan_root = directory.absolute()
+        if not _is_within(resolved, scan_root):
+            logger.debug(
+                "Skipping extensionless GGUF outside scanned root: %s", entry
+            )
             continue
         if not _is_valid_gguf(entry):
             continue
@@ -381,7 +444,7 @@ def discover_all_models(
     file path.  Sorted by model name.
     """
     if search_paths is None:
-        search_paths = [LLM_DIR]
+        search_paths = [_default_llm_category_dir()]
 
     models: list[ModelInfo] = []
     seen_paths: set[Path] = set()

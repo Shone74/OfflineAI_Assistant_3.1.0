@@ -176,7 +176,20 @@ class GgufEmbeddingModel(EmbeddingModel):
 
 
 def _resolve_embedding_model_path(explicit: str | Path | None = None) -> Path | None:
-    """Locate the mxbai embedding GGUF on disk, or ``None`` when absent."""
+    """Locate the mxbai embedding GGUF on disk, or ``None`` when absent.
+
+    Resolution order (all deterministic, never CWD-dependent):
+
+    1. Explicit *explicit* path argument.
+    2. ``MXBAI_EMBEDDING_MODEL_PATH`` environment variable.
+    3. The embedding category dir under the configured models root
+       (``<models_root>/embedding/`` — PHASE 3 contract).
+    4. Legacy fallback: the llm category dir under the models root
+       (pre-PHASE-3 trees kept embedding GGUFs beside LLMs).
+
+    No CWD-relative fallback candidates exist.  External search-path
+    architecture beyond the models root is out of scope for this phase.
+    """
     if explicit:
         p = Path(explicit)
         return p if p.exists() else None
@@ -185,25 +198,22 @@ def _resolve_embedding_model_path(explicit: str | Path | None = None) -> Path | 
         p = Path(env_path)
         if p.exists():
             return p
-    llm_dir: Path | None = None
     try:
-        from core.paths import LLM_DIR
+        from core.paths import MODEL_CATEGORIES, get_model_category_dir
 
-        llm_dir = Path(LLM_DIR)
+        if "embedding" in MODEL_CATEGORIES:
+            embedding_candidate = (
+                get_model_category_dir("embedding") / _DEFAULT_MXBAI_FILENAME
+            )
+            if embedding_candidate.exists():
+                return embedding_candidate
+        llm_candidate = (
+            get_model_category_dir("llm") / _DEFAULT_MXBAI_FILENAME
+        )
+        if llm_candidate.exists():
+            return llm_candidate
     except Exception:
-        llm_dir = None
-    candidates = []
-    if llm_dir is not None:
-        candidates.append(llm_dir / _DEFAULT_MXBAI_FILENAME)
-    candidates.extend(
-        [
-            Path("models") / "llm" / _DEFAULT_MXBAI_FILENAME,
-            Path(_DEFAULT_MXBAI_FILENAME),
-        ]
-    )
-    for c in candidates:
-        if c.exists():
-            return c
+        logger.debug("core.paths unavailable for embedding model resolution")
     return None
 
 

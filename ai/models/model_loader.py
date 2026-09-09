@@ -12,9 +12,7 @@ application remains functional in CI / demo mode (TEST_MODE only).
 
 from __future__ import annotations
 
-import os
 import struct
-import sys
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -22,9 +20,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from ai.models.gpu_runtime import (
+    GPU_LAYER_MAGIC_FULL,
+    apply_cuda_dll_discovery,
+    decide_gpu_layers,
+    detect_gpu_capabilities,
+)
 from ai.models.performance import InferenceMetrics, PerformanceProfiler
 from core.logger import get_logger
-from core.paths import LLM_DIR
+from core.paths import get_model_category_dir
 
 logger = get_logger("model_loader")
 _profiler = PerformanceProfiler()
@@ -363,69 +367,71 @@ class StubModelLoader(ModelLoader):
 def is_gpu_available() -> bool:
     """Return True if llama-cpp-python with CUDA/GPU offload backend is available.
 
-    Uses ``llama_cpp.llama_supports_gpu_offload()`` as the authoritative check.
-    ``pynvml`` is NOT used here — it is an optional dependency (``nvidia-ml-py3``)
-    that may not be installed.  pynvml is only used in :func:`get_gpu_vram_bytes`
-    for VRAM reporting.
+    Delegates to the centralized PHASE 4 runtime (:mod:`ai.models.gpu_runtime`).
     """
-    if not has_llama_cpp():
-        return False
-    try:
-        from llama_cpp import llama_supports_gpu_offload
-        return llama_supports_gpu_offload()
-    except Exception:
-        return False
+    return detect_gpu_capabilities().offload_supported
 
 
 def get_gpu_vram_bytes() -> int:
     """Return total VRAM in bytes for GPU index 0, or 0 if unavailable."""
-    try:
-        import pynvml
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-        return info.total
-    except Exception:
-        return 0
+    return detect_gpu_capabilities().vram_bytes
 
 
 def detect_optimal_gpu_layers() -> int:
-    """Auto-detect optimal n_gpu_layers for the current GPU + llama.cpp backend.
+    """Legacy compatibility shim — full offload when a capable GPU exists.
 
-    Strategy:
-    - If llama.cpp does not support GPU offload → return 0 (CPU only)
-    - If GPU offload is supported → return 999 (offload ALL layers; llama.cpp
-      internally caps this to the model's actual layer count and manages VRAM)
-    - VRAM info is used for logging only, NOT as a gate — ``n_gpu_layers=999``
-      is safe even when VRAM size is unknown because llama.cpp reserves memory
-      dynamically and will fall back gracefully if layers don't fit.
-
-    Note: ``n_gpu_layers=999`` tells llama.cpp to offload ALL layers to GPU.
+    .. deprecated:: PHASE 4
+        Universal full offload is unsafe for models larger than VRAM.
+        :func:`ai.models.gpu_runtime.decide_gpu_layers` is the model-aware
+        replacement; this shim is retained only for API compatibility and
+        is used by nothing in the production load path.
     """
     if not is_gpu_available():
-        logger.info("No NVIDIA GPU detected — using CPU mode (n_gpu_layers=0)")
+        logger.info("No GPU offload — CPU mode (n_gpu_layers=0)")
         return 0
-    vram = get_gpu_vram_bytes()
-    if vram > 0:
-        logger.info(
-            "NVIDIA GPU detected — VRAM: %.1f GB — using full GPU offload (n_gpu_layers=999)",
-            vram / (1024 ** 3),
-        )
-    else:
-        logger.info(
-            "GPU/CUDA offload available (VRAM size unavailable via pynvml) — "
-            "using full GPU offload (n_gpu_layers=999)"
-        )
-    return 999
+    logger.warning(
+        "detect_optimal_gpu_layers is deprecated (universal full offload); "
+        "use ai.models.gpu_runtime.decide_gpu_layers for model-aware strategy"
+    )
+    return GPU_LAYER_MAGIC_FULL
 
 
 def can_fit_model_on_gpu(model_size_bytes: int) -> bool:
-    """Return True if the model fits in GPU VRAM with headroom."""
-    vram = get_gpu_vram_bytes()
-    if vram == 0:
+    """Return True if the model fits in GPU VRAM with headroom.
+
+    Uses the conservative PHASE 4 estimator (overhead factor + KV cache
+    allowance + VRAM reserve).
+    """
+    from ai.models.gpu_runtime import estimate_model_vram_bytes
+
+    caps = detect_gpu_capabilities()
+    if not caps.vram_known:
         return False
-    # Require 20% headroom for KV cache + overhead
-    return model_size_bytes < vram * 0.8
+    from ai.models.gpu_runtime import _VRAM_RESERVE_FRACTION
+
+    safe_budget = int(caps.vram_bytes * (1.0 - _VRAM_RESERVE_FRACTION))
+    # Legacy callers have no n_ctx; assume a mid-range context.
+    return estimate_model_vram_bytes(model_size_bytes, 4096) <= safe_budget
+
+
+def _looks_like_gpu_failure(exc: BaseException) -> bool:
+    """Heuristic: does *exc* look like a GPU/CUDA allocation failure?
+
+    Used only to decide whether a CPU retry is worthwhile — never to
+    swallow the error (the retry re-raises on failure).
+    """
+    text = str(exc).lower()
+    markers = (
+        "cuda",
+        "ggml-cuda",
+        "vram",
+        "out of memory",
+        "cudaerror",
+        "devicememory",
+        "insufficient memory",
+        "cublas",
+    )
+    return any(marker in text for marker in markers)
 
 
 def _extract_streaming_text(chunk: dict[str, Any]) -> str:
@@ -477,19 +483,34 @@ class GGUFModelLoader(ModelLoader):
         n_ctx: int = 4096,
         auto_gpu_layers: bool = False,
         mmproj_path: Path | None = None,
+        gpu_mode: str = "auto",
     ) -> None:
         self.n_threads = n_threads
         self.n_ctx = n_ctx
         self._auto_gpu = auto_gpu_layers
+        self._gpu_mode = gpu_mode
         self._mmproj_path = mmproj_path
         self._vision_enabled = mmproj_path is not None
         self._model: Any = None
         self._model_path: Path | None = None
         self._load_error: str | None = None
-        if auto_gpu_layers and n_gpu_layers == 0:
-            self.n_gpu_layers = detect_optimal_gpu_layers()
+        # PHASE 4 GPU configuration semantics (backward compatible):
+        #   * auto_gpu_layers=True  → centralized model-aware strategy
+        #     (manual non-zero n_gpu_layers still wins as expert override).
+        #   * auto_gpu_layers=False + n_gpu_layers==0 → static CPU mode
+        #     (the historical default; nothing automatic happens).
+        #   * auto_gpu_layers=False + n_gpu_layers>0  → expert manual mode.
+        if auto_gpu_layers:
+            self._manual_gpu_layers: int | None = (
+                n_gpu_layers if n_gpu_layers > 0 else None
+            )
+            self._auto_decide = True
         else:
-            self.n_gpu_layers = n_gpu_layers
+            self._manual_gpu_layers = n_gpu_layers if n_gpu_layers > 0 else None
+            self._auto_decide = n_gpu_layers > 0
+        # Resolved per-model at load() time (needs the file size + ctx).
+        self.n_gpu_layers = n_gpu_layers
+        self._gpu_reason: str = ""
 
     @property
     def vision_enabled(self) -> bool:
@@ -528,6 +549,44 @@ class GGUFModelLoader(ModelLoader):
                 "Vision projector could not be attached (%s) — running text-only", exc
             )
 
+    def _decide_gpu_layers_for(self, path: Path) -> int:
+        """Run the centralized, model-aware GPU strategy for *path*.
+
+        Uses the file size and configured context length so a model larger
+        than the GPU budget never receives the universal full-offload
+        value.  Static/expert configurations (auto off with explicit
+        layers, or auto off + 0 = CPU) bypass the automatic strategy and
+        keep their exact value.  The decision and its reason are logged
+        (observability) and cached on the loader for the UI.
+        """
+        if not self._auto_decide:
+            self._gpu_reason = (
+                "static configuration (auto GPU off) — n_gpu_layers unchanged"
+            )
+            return self.n_gpu_layers
+        try:
+            size = path.stat().st_size
+        except OSError as exc:
+            logger.warning("Cannot stat %s for GPU sizing: %s — CPU mode", path, exc)
+            self._gpu_reason = "model size unavailable — CPU mode"
+            return 0
+        decision = decide_gpu_layers(
+            model_size_bytes=size,
+            n_ctx=self.n_ctx,
+            capabilities=detect_gpu_capabilities(),
+            mode=self._gpu_mode,
+            manual_layers=self._manual_gpu_layers,
+        )
+        self._gpu_reason = decision.reason
+        logger.info(
+            "GPU strategy for %s: %s (n_gpu_layers=%d) — %s",
+            path.name,
+            decision.strategy.value,
+            decision.n_gpu_layers,
+            decision.reason,
+        )
+        return decision.n_gpu_layers
+
     def load(self, path: Path) -> None:
         self._load_error = None
         try:
@@ -540,6 +599,9 @@ class GGUFModelLoader(ModelLoader):
 
         if not path.exists():
             raise FileNotFoundError(f"Model not found: {path}")
+
+        # Centralized GPU decision (model-aware; replaces universal 999).
+        self.n_gpu_layers = self._decide_gpu_layers_for(path)
 
         _profiler.start_load_timer()
         logger.info(
@@ -565,7 +627,28 @@ class GGUFModelLoader(ModelLoader):
                 kwargs.pop("mmproj", None)
                 self._model = Llama(**kwargs)
         except Exception as exc:
-            raise RuntimeError(f"Failed to load model {path.name}: {exc}") from exc
+            # GPU initialization failure vs. real model failure: when the
+            # strategy chose GPU layers and the failure looks like a
+            # CUDA/VRAM allocation problem, retry once on CPU before
+            # surfacing the error.  A retry that fails too is a genuine
+            # load failure and is re-raised (never silently swallowed).
+            if self.n_gpu_layers > 0 and _looks_like_gpu_failure(exc):
+                logger.warning(
+                    "GPU offload failed during load (%s) — retrying on CPU",
+                    exc,
+                )
+                self.n_gpu_layers = 0
+                self._gpu_reason = f"GPU load failed, fell back to CPU: {exc}"
+                kwargs["n_gpu_layers"] = 0
+                kwargs.pop("mmproj", None)
+                try:
+                    self._model = Llama(**kwargs)
+                except Exception as cpu_exc:
+                    raise RuntimeError(
+                        f"Failed to load model {path.name} (CPU retry): {cpu_exc}"
+                    ) from cpu_exc
+            else:
+                raise RuntimeError(f"Failed to load model {path.name}: {exc}") from exc
 
         self._model_path = path
         if self._mmproj_path is not None:
@@ -808,7 +891,7 @@ class GGUFModelLoader(ModelLoader):
         return "".join(parts)
 
 
-def discover_models(directory: Path = LLM_DIR) -> list[ModelInfo]:
+def discover_models(directory: Path | None = None) -> list[ModelInfo]:
     """Find all GGUF model files in *directory* and subdirectories.
 
     Discovers both:
@@ -816,8 +899,14 @@ def discover_models(directory: Path = LLM_DIR) -> list[ModelInfo]:
     - Extensionless files whose first 4 bytes are ``b"GGUF"``
       (``source=EXTENSIONLESS``)
 
+    PHASE 3: the default *directory* is the llm category dir under the
+    configured (user-selected) models root — resolved at call time, never
+    a module-import snapshot and never CWD-dependent.
+
     Returns a list of :class:`ModelInfo`.
     """
+    if directory is None:
+        directory = get_model_category_dir("llm")
     models: list[ModelInfo] = []
     if not directory.exists():
         return models
@@ -1285,33 +1374,15 @@ def has_llama_cpp() -> bool:
 
 
 def _add_cuda_dll_directories() -> None:
-    """Prepend pip-installed nvidia CUDA DLL dirs to PATH on Windows.
+    """Register CUDA DLL directories (PHASE 4 centralized discovery).
 
-    nvidia-* PyPI packages (nvidia-cuda-runtime, nvidia-cublas, etc.) place
-    their CUDA runtime DLLs in ``site-packages/nvidia/cuXX/bin/x86_64/``
-    but do not add that directory to PATH.  Without this, llama-cpp-python's
-    ``ggml-cuda.dll`` cannot find ``cudart64_*.dll`` and import fails with
-    ``RuntimeError``.
+    Kept as an internal alias for backward compatibility — the real
+    implementation lives in :mod:`ai.models.gpu_runtime` and covers the
+    ``nvidia`` package layout via the import system, ``sysconfig`` site
+    directories, explicitly registered locations, and only *additionally*
+    ``sys.path`` entries.
     """
-    if sys.platform != "win32":
-        return
-    try:
-        for entry in sys.path:
-            nvidia_root = Path(entry) / "nvidia"
-            if not nvidia_root.is_dir():
-                continue
-            for cu_dir in sorted(nvidia_root.iterdir(), reverse=True):
-                if not cu_dir.is_dir() or not cu_dir.name.startswith("cu"):
-                    continue
-                for bin_sub in ("bin", "bin/x86_64"):
-                    bin_path = cu_dir / bin_sub
-                    if bin_path.is_dir():
-                        dll_dir = str(bin_path.resolve())
-                        current_path = os.environ.get("PATH", "")
-                        if dll_dir not in current_path:
-                            os.environ["PATH"] = os.pathsep.join([dll_dir, current_path])
-    except Exception as exc:
-        logger.debug("Could not add CUDA DLL directories: %s", exc)
+    apply_cuda_dll_discovery()
 
 
 def _try_import_llama_cpp() -> bool:

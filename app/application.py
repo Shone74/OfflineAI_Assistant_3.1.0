@@ -26,7 +26,15 @@ from core.assistant import Assistant
 from core.config_manager import ConfigManager
 from core.event_bus import EventBus
 from core.logger import apply_log_level, get_logger
-from core.paths import DATA_DIR, LLM_DIR
+from core.paths import (
+    DATA_DIR,
+    ensure_dirs,
+    get_knowledge_docs_dir,
+    get_model_category_dir,
+    get_models_root,
+    get_plugins_dir,
+    user_data_root,
+)
 from core.router import Router
 from core.security_layer import SecurityLayer
 from database.database_manager import DatabaseManager
@@ -149,15 +157,17 @@ class ApplicationManager:
         self._shutting_down: bool = False
 
     def _ensure_user_dirs(self) -> None:
-        """Ensure user data directories exist before any component writes to them."""
-        from core.paths import CONFIG_DIR, DATA_DIR, LOGS_DIR, MODELS_DIR
-        
-        for path in [CONFIG_DIR, DATA_DIR, LOGS_DIR, MODELS_DIR]:
-            try:
-                path.mkdir(parents=True, exist_ok=True)
-                logger.debug("Ensured directory exists: %s", path)
-            except OSError as exc:
-                logger.warning("Could not create directory %s: %s", path, exc)
+        """Ensure user data directories exist before any component writes to them.
+
+        Delegates to :func:`core.paths.ensure_dirs` — the single explicit
+        directory-creation point.  Importing ``core.paths`` alone never
+        creates directories.
+        """
+        try:
+            ensure_dirs()
+            logger.debug("User data directories ensured")
+        except OSError as exc:
+            logger.warning("Could not create user data directories: %s", exc)
 
     def _is_first_run(self) -> bool:
         """Check if this is the first run (welcome not yet completed)."""
@@ -245,22 +255,41 @@ class ApplicationManager:
         self._event_bus = EventBus.get_instance()
         self._router = Router()
 
+        # PHASE 3: all model storage derives from the single user-selected
+        # models root (models.storage_root -> core.paths.get_models_root).
+        # The llm category dir under that root is the primary models dir;
+        # configured search paths (absolute only) are honoured as-is.
+        models_root = get_models_root()
+        llm_category_dir = get_model_category_dir("llm")
         models_dir = self._config.get("ai.models_dir")
-        search_paths = self._config.get("ai.model_search_paths", [str(LLM_DIR)])
+        if not models_dir or not Path(models_dir).is_absolute():
+            models_dir = str(llm_category_dir)
+        search_paths = self._config.get("ai.model_search_paths", [str(llm_category_dir)])
         ollama_dir = self._config.get("ai.ollama_models_dir", "")
         ollama_models_dir = Path(ollama_dir) if ollama_dir else None
         n_threads = self._config.get("ai.n_threads", 4)
         n_gpu_layers = self._config.get("ai.n_gpu_layers", 0)
         n_ctx = self._config.get("ai.n_ctx", 4096)
         auto_gpu = self._config.get("ai.auto_gpu_layers", False)
+        # PHASE 4: canonical GPU execution mode (auto / cpu / gpu).  An
+        # expert n_gpu_layers override is validated by the runtime decision
+        # point, never bypassing hard capability limits.
+        gpu_mode = str(self._config.get("ai.gpu_mode", "auto") or "auto").lower()
+        if gpu_mode not in ("auto", "cpu", "gpu"):
+            logger.warning("Invalid ai.gpu_mode %r — falling back to 'auto'", gpu_mode)
+            gpu_mode = "auto"
+        logger.info(
+            "Model storage root: %s (llm category: %s)", models_root, models_dir
+        )
         self._model_manager = ModelManager(
-            models_dir=Path(models_dir) if models_dir else LLM_DIR,
+            models_dir=Path(models_dir),
             search_paths=[Path(p) for p in search_paths],
             ollama_models_dir=ollama_models_dir,
             n_threads=n_threads,
             n_gpu_layers=n_gpu_layers,
             n_ctx=n_ctx,
             auto_gpu_layers=auto_gpu,
+            gpu_mode=gpu_mode,
         )
         self._engine = LlamaCppEngine()
         self._memory = MemoryManager(
@@ -291,7 +320,15 @@ class ApplicationManager:
 
         self._plugin_manager = PluginManager(self._tools, self._event_bus, config=self._config)
         try:
-            plugins_dir = self._config.get("plugins.directory", "plugins")
+            # CWD-independent default: the writable runtime plugins directory
+            # under the user-data root (where operators drop plugins).  An
+            # absolute configured value is used as-is; a relative value is
+            # resolved against the user-data root, never against the CWD.
+            plugins_dir = self._config.get("plugins.directory", "")
+            if not plugins_dir:
+                plugins_dir = str(get_plugins_dir())
+            elif not Path(plugins_dir).is_absolute():
+                plugins_dir = str(user_data_root() / plugins_dir)
             n = self._plugin_manager.discover_and_load(plugins_dir)
             logger.info("Plugin manager ready — %d plugin(s) loaded", n)
         except Exception:
@@ -315,7 +352,17 @@ class ApplicationManager:
                 logger.warning("Failed to load persisted knowledge from %s", knowledge_path)
 
         # Index documents from knowledge directory
-        docs_dir = self._config.get("knowledge.directory", "knowledge_docs")
+        # CWD-independent default: the writable runtime knowledge documents
+        # directory under the user-data root (where the user drops *.md/*.txt
+        # files).  The indexer only reads this directory; the persistent
+        # index stays under the data directory.  An absolute configured
+        # value is used as-is; a relative value resolves against the
+        # user-data root, never against the CWD.
+        docs_dir = self._config.get("knowledge.directory", "")
+        if not docs_dir:
+            docs_dir = str(get_knowledge_docs_dir())
+        elif not Path(docs_dir).is_absolute():
+            docs_dir = str(user_data_root() / docs_dir)
         try:
             indexed = self._knowledge.index_directory(docs_dir)
             if indexed > 0 or loaded_count == 0:
@@ -578,7 +625,20 @@ class ApplicationManager:
         return 0
 
     def stop(self) -> None:
+        if self._shutting_down:
+            return
         self._shutting_down = True
+
+        # Shutdown chat voice coordinator first (created externally by
+        # application_final.main; lives on the GUI thread and may own a
+        # short transcription worker that must finish before teardown).
+        coordinator = getattr(self, "_chat_coordinator", None)
+        if coordinator is not None:
+            try:
+                coordinator.shutdown()
+            except Exception:
+                logger.warning("ChatVoiceCoordinator shutdown failed", exc_info=True)
+            self._chat_coordinator = None
 
         # Wait for the startup model load worker to finish naturally before
         # proceeding with model/engine teardown.  The worker may be inside
@@ -642,31 +702,56 @@ class ApplicationManager:
             except Exception:
                 logger.warning("Failed to persist plugin states")
 
+        # Each remaining cleanup step is independently guarded: one
+        # failing cleanup must never truncate the rest of shutdown.
         if self._memory is not None:
-            self._memory.close()
+            try:
+                self._memory.close()
+            except Exception:
+                logger.warning("Memory close failed during shutdown", exc_info=True)
 
         if self._model_manager is not None:
-            self._model_manager.unload()
+            try:
+                self._model_manager.unload()
+            except Exception:
+                logger.warning("Model unload failed during shutdown", exc_info=True)
         if self._assistant is not None:
-            self._assistant.stop()
+            try:
+                self._assistant.stop()
+            except Exception:
+                logger.warning("Assistant stop failed during shutdown", exc_info=True)
         db = getattr(self, "_db_manager", None)
         if db is not None:
-            db.close()
+            try:
+                db.close()
+            except Exception:
+                logger.warning("Database close failed during shutdown", exc_info=True)
         timer = getattr(self, "_scheduler_timer", None)
         if timer is not None:
-            timer.stop()
+            try:
+                timer.stop()
+                logger.info("Automation scheduler stopped")
+            except Exception:
+                logger.warning(
+                    "Scheduler timer stop failed during shutdown", exc_info=True
+                )
             timer = None
-            logger.info("Automation scheduler stopped")
         voice = getattr(self, "_voice", None)
         if voice is not None:
-            voice.stop()
-            logger.info("Voice resources released")
+            try:
+                voice.stop()
+                logger.info("Voice resources released")
+            except Exception:
+                logger.warning("Voice stop failed during shutdown", exc_info=True)
         window = getattr(self, "_window", None)
         if window is not None:
-            window._unsubscribe_all_events()
-            window._voice = None  # break reference cycle for VoicePage
-            window.close()
-            logger.info("MainWindow closed and cleaned up")
+            try:
+                window._unsubscribe_all_events()
+                window._voice = None  # break reference cycle for VoicePage
+                window.close()
+                logger.info("MainWindow closed and cleaned up")
+            except Exception:
+                logger.warning("Window cleanup failed during shutdown", exc_info=True)
         self._started = False
         logger.info("Application stopped")
 
@@ -732,6 +817,11 @@ class ApplicationManager:
         )
         worker.success.connect(self._on_startup_model_loaded)
         worker.failure.connect(self._on_startup_model_load_failed)
+        # Standard Qt worker lifetime: once the thread has fully exited,
+        # deleteLater reclaims the QThread.  Without this, the wrapper
+        # could be destroyed while the thread is still finishing (the
+        # "QThread: Destroyed while thread is still running" hazard).
+        worker.finished.connect(worker.deleteLater)
         worker.start()
         self._model_load_worker = worker
         logger.info("Default model loading started in background")
@@ -741,7 +831,6 @@ class ApplicationManager:
         """GUI-thread slot: default model loaded successfully."""
         if getattr(self, "_shutting_down", False):
             return
-        self._model_load_worker = None
         assert self._event_bus is not None
         logger.info("Default model loaded: %s", model_name)
         self._event_bus.publish(
@@ -754,7 +843,6 @@ class ApplicationManager:
         """GUI-thread slot: default model loading failed."""
         if getattr(self, "_shutting_down", False):
             return
-        self._model_load_worker = None
         assert self._event_bus is not None
         logger.error("Default model load failed: %s", error)
         self._event_bus.publish(

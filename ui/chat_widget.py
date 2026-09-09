@@ -11,7 +11,6 @@ from typing import Any
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QResizeEvent, QTextDocument
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -707,7 +706,9 @@ class ChatWidget(QWidget):
         )
         self._update_item_size_hint(self._streaming_item)
         self._message_list.scrollToBottom()
-        QApplication.processEvents()
+        # No event-loop pumping here: tokens arrive via queued
+        # signals on the GUI thread — the event loop is already running;
+        # pumping it per token caused redundant dispatch/re-layout.
 
     def finish_streaming(self) -> None:
         """Complete the streaming response.

@@ -46,6 +46,8 @@ class MemoryManager:
         self._memory_index: VectorMemory | None = None
         self._memory_records: dict[str, MemoryEntry] = {}
         self._memory_index_count: int = -1
+        # M7: high-water mark of memory row ids already embedded.
+        self._memory_index_max_id: int = -1
 
         self._conversation_id: int | None = None
         self._default_workspace_id = default_workspace_id
@@ -345,26 +347,53 @@ class MemoryManager:
         self._memory_index = None
         self._memory_records = {}
         self._memory_index_count = -1
+        self._memory_index_max_id = -1
 
     def _ensure_memory_index(self) -> None:
         """Lazily (re)build the in-memory embedding index over memory records.
 
-        Rebuilds only when the live memory count differs from the cached count,
-        so repeated searches are cheap.  Embeddings are generated on demand and
-        never written back to the database.
+        M7 (incremental): when only NEW memories were added since the last
+        build (the common case — a conversation saved a few facts), only
+        those rows are fetched and embedded; existing embeddings are
+        reused.  A full rebuild happens only when the index is missing or
+        the live row count DROPPED below the indexed count (deletions —
+        row ids of the remaining rows may have shifted relative to the
+        watermark, so the mapping must be rebuilt).  Embeddings are
+        generated on demand and never written back to the database.
         """
         if self._memory_index is None:
             self._memory_index = VectorMemory(self._embedding_model)
             self._memory_index_count = -1
+            self._memory_index_max_id = -1
         live = self._long_term.count_memories()
         if live == self._memory_index_count:
             return
-        self._memory_index.clear()
-        self._memory_records = {}
-        for mem in self._long_term.get_all_memories(limit=10000):
+        if live < self._memory_index_count or self._memory_index_count == -1:
+            # Deletion since the last build (or first build): the id
+            # watermark mapping is no longer trustworthy — rebuild fully.
+            self._memory_index.clear()
+            self._memory_records = {}
+            self._memory_index_max_id = -1
+            for mem in self._long_term.get_all_memories(limit=10000):
+                if mem.content:
+                    entry_id = self._memory_index.add(mem.content)
+                    self._memory_records[entry_id] = mem
+                    if mem.id is not None and mem.id > self._memory_index_max_id:
+                        self._memory_index_max_id = mem.id
+            self._memory_index_count = live
+            return
+        # live > indexed count: additions only — fetch just the rows with
+        # id above the watermark and embed only those.
+        rows = self._long_term._db.query(
+            "SELECT * FROM memories WHERE id > ? ORDER BY id ASC LIMIT 10000",
+            (self._memory_index_max_id,),
+        )
+        for mem in self._long_term._rows_to_entries(rows):
             if mem.content:
                 entry_id = self._memory_index.add(mem.content)
                 self._memory_records[entry_id] = mem
+                if mem.id is not None and mem.id > self._memory_index_max_id:
+                    self._memory_index_max_id = mem.id
         self._memory_index_count = live
 
     # ------------------------------------------------------------------ #

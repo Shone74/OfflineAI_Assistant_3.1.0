@@ -1,4 +1,4 @@
-"""Installer System — Phase 12 (v1.2.0).
+"""Installer System — packaging, hardware detection and model download.
 
 Public API:
     detect_hardware       — detect CPU / RAM / GPU / Storage
@@ -8,7 +8,8 @@ Public API:
     InnoSetupScript       — generated Inno Setup script content
     build_pyinstaller_spec — generate a PyInstaller spec
     write_pyinstaller_spec — write a PyInstaller spec to disk
-    build_inno_setup_script — generate an Inno Setup script
+    build_inno_setup_script — generate an Inno Setup script (PHASE 6)
+    write_production_inno_script — write the production .iss
     generate_installer_package — generate both packaging artifacts
     InstallConfig         — per-profile installation configuration
     InstallProfile        — installation profile enum
@@ -32,6 +33,7 @@ from installer.packager import (
     build_inno_setup_script,
     build_pyinstaller_spec,
     generate_installer_package,
+    write_production_inno_script,
     write_pyinstaller_spec,
 )
 
@@ -49,5 +51,6 @@ __all__ = [
     "detect_hardware",
     "generate_installer_package",
     "recommend_model",
+    "write_production_inno_script",
     "write_pyinstaller_spec",
 ]

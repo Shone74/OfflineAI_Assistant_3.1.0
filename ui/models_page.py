@@ -204,7 +204,13 @@ class ModelsPage(QWidget):
 
     def _on_refresh(self) -> None:
         if self._model_manager is not None:
-            self._model_manager.rescan()
+            # H4: the Refresh button always bypasses the discovery cache —
+            # the user explicitly asked for a real filesystem rescan.
+            rescan = getattr(self._model_manager, "rescan_force", None)
+            if rescan is not None:
+                rescan()
+            else:
+                self._model_manager.rescan()
             self.set_models(self._model_manager.list_models())
             self._update_status()
 
@@ -217,7 +223,21 @@ class ModelsPage(QWidget):
         if directory and self._model_manager is not None:
             from pathlib import Path
 
-            self._model_manager.set_models_dir(Path(directory))
+            picked = Path(directory)
+            # PHASE 8: the picked folder is treated as the models ROOT
+            # (a legacy /llm category pick is normalized to its parent).
+            # The manager scans the llm category dir under that root —
+            # the same derivation core.paths.set_models_root persists —
+            # and the choice is persisted through the canonical
+            # models.storage_root contract so it survives restart.
+            root = picked.parent if picked.name.lower() == "llm" else picked
+            try:
+                from core.paths import set_models_root
+
+                set_models_root(root)
+            except (ValueError, OSError) as exc:
+                logger.warning("Models root change not persisted: %s", exc)
+            self._model_manager.set_models_dir(root / "llm")
             self._on_refresh()
             if self._assistant is not None and hasattr(self._assistant, "_engine"):
                 engine = self._assistant._engine
@@ -226,8 +246,16 @@ class ModelsPage(QWidget):
                         engine.configure(self._model_manager)
                     except Exception as exc:
                         logger.warning("Engine reconfiguration after folder change failed: %s", exc)
+            if self._event_bus is not None:
+                try:
+                    self._event_bus.publish(
+                        "CONFIG_CHANGED",
+                        data={"key": "models.storage_root", "value": str(root)},
+                    )
+                except Exception as exc:
+                    logger.debug("Could not publish models root change: %s", exc)
             self._details.setText(
-                f"<b>Models Folder:</b> {directory}<br>"
+                f"<b>Models Folder:</b> {root / 'llm'}<br>"
                 f"<b>Discovered:</b> {len(self._models)} model(s)"
             )
 

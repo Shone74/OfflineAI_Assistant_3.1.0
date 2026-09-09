@@ -231,3 +231,207 @@ bilingual strength, 128K context.
   Embeddings. Keep the original filenames when downloading.
 - MoE models (30B-A3B class) are the only >10 GB models that stay *fast* on this
   hardware; dense 24B+ hybrids are background-task territory.
+
+
+
+1. Qwen3.5-9B UD-Q4_K_XL - https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-UD-Q4_K_XL.gguf?download=true
+2. Qwen3.5-9B mmproj-BF16 - https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/mmproj-BF16.gguf?download=true
+3. Qwen3-Coder-30B-A3B-Instruct UD-Q3_K_XL - https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf?download=true
+4. Qwen3-4B-Thinking-2507 UD-Q4_K_XL - https://huggingface.co/unsloth/Qwen3-4B-Thinking-2507-GGUF/resolve/main/Qwen3-4B-Thinking-2507-UD-Q4_K_XL.gguf?download=true
+5. Qwen2.5-VL-7B-Instruct Q4_K_M - https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf?download=true
+6. Qwen2.5-VL-7B-Instruct mmproj-F16 - https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf?download=true
+7. mxbai-embed-large-v1 F16 - https://huggingface.co/mixedbread-ai/mxbai-embed-large-v1/resolve/main/gguf/mxbai-embed-large-v1-f16.gguf?download=true
+8. Ornith-1.5-9B Q4_K_M - https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF/resolve/main/Ornith-1.5-9B-Q4_K_M.gguf?download=true
+9. Ornith-1.5-9B mmproj-BF16 - https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF/resolve/main/mmproj-Ornith-1.5-9B-BF16.gguf?download=true
+10. Gemma-4-12B-it QAT UD-Q4_K_XL - https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF/resolve/main/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf?download=true
+11. Gemma-4-12B-it mmproj-BF16 - https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF/resolve/main/mmproj-BF16.gguf?download=true
+12. Llama-3.1-8B-Instruct Q4_K_M - https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf?download=true
+13. Mistral-Nemo-Instruct-2407 Q4_K_M - https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-GGUF/resolve/main/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf?download=true
+14. Qwen2.5-Coder-14B-Instruct Q4_K_M - https://huggingface.co/Qwen/Qwen2.5-Coder-14B-Instruct-GGUF/resolve/main/qwen2.5-coder-14b-instruct-q4_k_m.gguf?download=true
+15. Qwen2.5-Coder-7B-Instruct Q4_K_M - https://huggingface.co/unsloth/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf?download=true
+16. Qwen3-30B-A3B-Thinking-2507 UD-Q3_K_XL - https://huggingface.co/unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF/resolve/main/Qwen3-30B-A3B-Thinking-2507-UD-Q3_K_XL.gguf?download=true
+17. DeepSeek-R1-Distill-Qwen-7B Q4_K_M - https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf?download=true
+18. Gemma-3-12B-it Q4_K_M - https://huggingface.co/ggml-org/gemma-3-12b-it-GGUF/resolve/main/gemma-3-12b-it-Q4_K_M.gguf?download=true
+19. Gemma-3-12B-it mmproj-F16 - https://huggingface.co/ggml-org/gemma-3-12b-it-GGUF/resolve/main/mmproj-model-f16.gguf?download=true
+20. Gemma-3-4B-it Q4_K_M - https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf?download=true
+21. Gemma-3-4B-it mmproj-F16 - https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/mmproj-model-f16.gguf?download=true
+22. Llama-3.1-8B-Instruct Q4_K_M - https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf?download=true
+23. Qwen2.5-14B-Instruct Q4_K_M - https://huggingface.co/lmstudio-community/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf?download=true
+
+
+
+
+pojasnjenje:
+
+
+
+Klik na naziv/fajl treba direktno da pokrene download, bez traženja fajla po repozitorijumu.
+
+Važna ispravka u odnosu na tvoju listu: nekoliko stavki iz originalnog spiska imaju pogrešna imena/veličine, a faster-whisper modeli nisu GGUF — njih ne treba stavljati u models/llm.
+
+🟢 Moji prvi izbori za RTX 3080 10 GB
+#	Model	Quant	Veličina	Download
+1	Qwen3.5-9B	UD-Q4_K_XL	5.97 GB	Qwen3.5-9B UD-Q4_K_XL.gguf
+2	Ornith-1.5-9B	Q4_K_M	5.78 GB	Ornith-1.5-9B Q4_K_M.gguf
+3	Gemma 4 12B IT QAT	UD-Q4_K_XL	6.72 GB	Gemma-4-12B UD-Q4_K_XL.gguf
+4	Qwen2.5-VL-7B	Q4_K_M	4.68 GB	Qwen2.5-VL-7B Q4_K_M.gguf
+
+Qwen3.5 repo zaista ima UD-Q4_K_XL od 5.97 GB, a Gemma 4 ima 6.72 GB model + 175 MB mmproj. Qwen2.5-VL Q4_K_M je 4.68 GB.
+
+👁️ MMProj fajlovi za Vision
+
+Ove moraš skinuti pored modela, u isti folder.
+
+Qwen3.5-9B:
+
+Qwen3.5 mmproj-BF16.gguf
+
+Gemma 4:
+
+Gemma 4 mmproj-BF16.gguf
+
+Ornith:
+
+Ornith mmproj-BF16.gguf
+
+Ornith repo eksplicitno sadrži mmproj-Ornith-1.5-9B-BF16.gguf od ~922 MB.
+
+Qwen2.5-VL:
+
+Qwen2.5-VL mmproj-F16.gguf
+
+💻 Coding modeli
+Model	Quant	Veličina	Download
+Qwen3-Coder-30B-A3B-Instruct	UD-Q3_K_XL	13.8 GB	Qwen3-Coder-30B-A3B UD-Q3_K_XL.gguf
+Qwen2.5-Coder-14B-Instruct	Q4_K_M	8.99 GB	Qwen2.5-Coder-14B Q4_K_M.gguf
+Qwen2.5-Coder-7B-Instruct	Q4_K_M	~4.5 GB	Qwen2.5-Coder-7B Q4_K_M.gguf
+
+Qwen3-Coder 30B je posebno zanimljiv za tvoju mašinu jer je MoE; provereni UD-Q3_K_XL je 13.8 GB.
+
+Za 10 GB VRAM bih uzeo baš UD-Q3_K_XL, ne Q4.
+
+🧠 Reasoning / Analyst
+Model	Quant	Download
+Qwen3-30B-A3B-Thinking-2507	UD-Q3_K_XL	Qwen3-30B-A3B Thinking UD-Q3_K_XL.gguf
+Qwen3-4B-Thinking-2507	UD-Q4_K_XL	Qwen3-4B Thinking UD-Q4_K_XL.gguf
+DeepSeek-R1-Distill-Qwen-7B	Q4_K_M	DeepSeek-R1-Distill-Qwen-7B Q4_K_M.gguf
+
+Qwen3-30B-A3B-Thinking repo potvrđeno postoji i ima UD-Q3_K_XL od 13.8 GB.
+
+👁️ Ostali Vision modeli
+Gemma 3 12B
+
+Gemma-3-12B Q4_K_M.gguf
+
+MMProj:
+
+Gemma-3-12B mmproj-model-f16.gguf
+
+Model je ~7.3 GB, a repo zaista uključuje mmproj.
+
+Gemma 3 4B
+
+Gemma-3-4B Q4_K_M.gguf
+
+MMProj:
+
+Gemma-3-4B mmproj-model-f16.gguf
+
+Q4 je 2.49 GB.
+
+🧩 Ostali general-purpose modeli
+Llama 3.1 8B
+
+Llama-3.1-8B-Instruct Q4_K_M.gguf
+
+Proverena veličina: 4.92 GB.
+
+Mistral Nemo 12B
+
+Mistral-Nemo-12B Q4_K_M.gguf
+
+Q4_K_M je oko 7.48 GB.
+
+Qwen2.5 14B
+
+Qwen2.5-14B-Instruct Q4_K_M.gguf
+
+Proverena veličina: 8.99 GB.
+
+🧠 Embeddings
+
+Za tvoj memory.embedding_model ja bih stavio mxbai.
+
+mxbai-embed-large-v1
+
+mxbai-embed-large-v1 F16 GGUF
+
+To je 670 MB i originalni MixedBread repo ga direktno nudi u GGUF-u.
+
+Postoji i manji community conversion:
+
+mxbai-embed-large-v1 Q8 GGUF
+
+bge-large-en-v1.5
+
+bge-large-en-v1.5 F32 GGUF
+
+ili, za mnogo manji fajl:
+
+bge-large-en-v1.5 Q8 GGUF
+
+Repo navodi 341 MB za Q8.
+
+🎙️ STT — bitna ispravka
+
+Ovde nemoj skidati GGUF.
+
+Tvoj faster-whisper koristi CTranslate2 modele, ne llama.cpp GGUF modele. Dakle:
+
+models/
+└── voice/
+    └── stt/
+        ├── tiny/
+        ├── base/
+        ├── small/
+        └── large-v3-turbo/
+
+whisper-small i whisper-large-v3-turbo treba preuzeti u formatu koji faster-whisper očekuje, a ne kao .gguf.
+
+🚀 A šta bih ja stvarno instalirao?
+
+Za tvoju 3080 10 GB + 32 GB RAM mašinu ne bih skinuo svih 25. Napravio bih ovaj set:
+
+models/
+├── llm/
+│   ├── Qwen3.5-9B-UD-Q4_K_XL.gguf
+│   ├── mmproj-BF16.gguf
+│   │
+│   ├── Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf
+│   │
+│   ├── Qwen3-4B-Thinking-2507-UD-Q4_K_XL.gguf
+│   │
+│   └── Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf
+│       mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf
+│
+├── embedding/
+│   └── mxbai-embed-large-v1-f16.gguf
+│
+└── voice/
+    └── stt/
+        ├── base/
+        ├── small/
+        └── large-v3-turbo/
+
+To je moj konkretan izbor za tvoj Offline AI Assistant:
+
+🥇 Qwen3.5-9B — default/daily driver
+👨‍💻 Qwen3-Coder-30B-A3B — Coder agent
+🧠 Qwen3-4B-Thinking — Planner
+👁️ Qwen2.5-VL-7B — dedicated Vision fallback
+🔎 mxbai-embed-large-v1 — Memory/RAG
+🎙️ whisper-small / large-v3-turbo — STT
+
+I još jedna stvar: Qwen3.5-9B + njegov mmproj ti je verovatno dovoljan za većinu Vision + Chat + Agent slučajeva, tako da Qwen2.5-VL ne moraš odmah ni da skidaš. Qwen3.5 repo potvrđuje da je model multimodalan i podržava image-text input.
+
+Ako hoćeš, mogu ti sledeće napraviti jedan download-models.ps1 za Windows koji jednim pokretanjem napravi kompletan models/ folder i skine tačno ovih 6 modela + mmproj fajlove na odgovarajuća mesta.
