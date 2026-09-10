@@ -174,6 +174,7 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
         assistant=assistant,
         voice_manager=voice,
         event_bus=event_bus,
+        config=config,
     )
     coordinator.wire()
     manager._chat_coordinator = coordinator
