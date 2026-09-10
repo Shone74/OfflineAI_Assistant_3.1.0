@@ -94,6 +94,7 @@ class ChatVoiceCoordinator(QWidget):
         assistant: Any,
         voice_manager: Any,
         event_bus: Any,
+        config: Any = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -101,6 +102,7 @@ class ChatVoiceCoordinator(QWidget):
         self._assistant = assistant
         self._voice = voice_manager
         self._event_bus = event_bus
+        self._config = config
 
         self._wired = False
         self._generation_active = False
@@ -380,10 +382,11 @@ class ChatVoiceCoordinator(QWidget):
             and self._event_bus is not None
         ):
             try:
-                from core.config_manager import ConfigManager
-
-                cfg = ConfigManager()
-                if cfg.get("voice.enabled", True):
+                cfg = self._config
+                if cfg is None:
+                    from core.config_manager import ConfigManager
+                    cfg = ConfigManager()
+                if cfg.get("voice.output_enabled", cfg.get("voice.enabled", True)):
                     self._voice.speak(text)
                     return
             except Exception:
@@ -397,6 +400,10 @@ class ChatVoiceCoordinator(QWidget):
     def _on_voice_input(self) -> None:
         """REC button — manual push-to-talk (different from auto-listen)."""
         if self._voice is None:
+            return
+        if self._config is not None and not self._config.get(
+            "voice.input_enabled", self._config.get("voice.enabled", True)
+        ):
             return
         self._voice.handle_mic_click()
         self._sync_voice_ui()

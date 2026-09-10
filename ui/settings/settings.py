@@ -77,8 +77,7 @@ class VoiceSettingsTab(QWidget):
     """Tab for voice/STT/TTS configuration.
 
     Exposes controls for the STT subsystem (fully functional) and TTS
-    subsystem (with stub fallback).  A master "Voice Enabled" checkbox
-    controls ``voice.enabled``.
+    subsystem (with stub fallback), with independent input/output switches.
     """
 
     _LANG_DISPLAY: ClassVar[dict[str, str]] = {"auto": "Auto", "sr": "Serbian", "en": "English"}
@@ -101,11 +100,16 @@ class VoiceSettingsTab(QWidget):
     def _setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
 
-        # --- Voice Enabled master switch ---
-        self._enabled_chk = QCheckBox("Enable voice input and output")
-        self._enabled_chk.setToolTip("When unchecked, voice input (wake-word, STT) and TTS output are disabled")
-        self._enabled_chk.stateChanged.connect(self._on_voice_enabled_changed)
-        main_layout.addWidget(self._enabled_chk)
+        # --- Independent voice directions ---
+        self._input_enabled_chk = QCheckBox("Enable voice input")
+        self._input_enabled_chk.setToolTip("Allow microphone recording, speech recognition, and wake-word input")
+        self._input_enabled_chk.stateChanged.connect(self._on_voice_input_enabled_changed)
+        self._output_enabled_chk = QCheckBox("Enable voice output")
+        self._output_enabled_chk.setToolTip("Allow the assistant to read responses aloud")
+        self._output_enabled_chk.stateChanged.connect(self._on_voice_output_enabled_changed)
+        main_layout.addWidget(self._input_enabled_chk)
+        main_layout.addWidget(self._output_enabled_chk)
+        self._enabled_chk = self._input_enabled_chk
 
         # --- STT / Speech Recognition section ---
         stt_group = QGroupBox("Speech Recognition (STT)")
@@ -241,9 +245,13 @@ class VoiceSettingsTab(QWidget):
         display = self._LANG_DISPLAY.get(language, "Auto")
         self._language_combo.setCurrentIndex(max(self._language_combo.findText(display), 0))
 
-        self._enabled_chk.blockSignals(True)
-        self._enabled_chk.setChecked(config.get("voice.enabled", True))
-        self._enabled_chk.blockSignals(False)
+        legacy_enabled = config.get("voice.enabled", True)
+        self._input_enabled_chk.blockSignals(True)
+        self._input_enabled_chk.setChecked(config.get("voice.input_enabled", legacy_enabled))
+        self._input_enabled_chk.blockSignals(False)
+        self._output_enabled_chk.blockSignals(True)
+        self._output_enabled_chk.setChecked(config.get("voice.output_enabled", legacy_enabled))
+        self._output_enabled_chk.blockSignals(False)
 
         tts_cfg = config.get("voice.tts", {})
         self._tts_provider_combo.blockSignals(True)
@@ -303,11 +311,14 @@ class VoiceSettingsTab(QWidget):
             logger.debug("Persisting recommended STT values failed", exc_info=True)
 
     def save_settings(self, config: ConfigManager) -> None:
-        config.set("voice.enabled", self._enabled_chk.isChecked())
+        input_enabled = self._input_enabled_chk.isChecked()
+        output_enabled = self._output_enabled_chk.isChecked()
+        config.set("voice.input_enabled", input_enabled)
+        config.set("voice.output_enabled", output_enabled)
+        config.set("voice.enabled", input_enabled or output_enabled)
         if self._event_bus is not None:
-            self._event_bus.publish(
-                "CONFIG_CHANGED", {"key": "voice.enabled", "value": self._enabled_chk.isChecked()}
-            )
+            self._event_bus.publish("CONFIG_CHANGED", {"key": "voice.input_enabled", "value": input_enabled})
+            self._event_bus.publish("CONFIG_CHANGED", {"key": "voice.output_enabled", "value": output_enabled})
         config.set("voice.stt.provider", self._provider_combo.currentText())
         if self._event_bus is not None:
             self._event_bus.publish(
@@ -488,13 +499,21 @@ class VoiceSettingsTab(QWidget):
                 "CONFIG_CHANGED", {"key": "voice.language", "value": lang}
             )
 
-    def _on_voice_enabled_changed(self, state: int) -> None:
+    def _on_voice_input_enabled_changed(self, state: int) -> None:
         enabled = state == Qt.CheckState.Checked
-        self._config.set("voice.enabled", enabled)
+        self._config.set("voice.input_enabled", enabled)
         if self._event_bus is not None:
-            self._event_bus.publish(
-                "CONFIG_CHANGED", {"key": "voice.enabled", "value": enabled}
-            )
+            self._event_bus.publish("CONFIG_CHANGED", {"key": "voice.input_enabled", "value": enabled})
+
+    def _on_voice_output_enabled_changed(self, state: int) -> None:
+        enabled = state == Qt.CheckState.Checked
+        self._config.set("voice.output_enabled", enabled)
+        if self._event_bus is not None:
+            self._event_bus.publish("CONFIG_CHANGED", {"key": "voice.output_enabled", "value": enabled})
+
+    def _on_voice_enabled_changed(self, state: int) -> None:
+        """Compatibility alias for integrations using the former master switch."""
+        self._on_voice_input_enabled_changed(state)
 
     def _on_tts_provider_changed(self, value: str) -> None:
         self._config.set("voice.tts.provider", value)

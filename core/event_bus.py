@@ -122,6 +122,7 @@ EVENT_TYPES = frozenset(
         "VOICE_PLAY_DONE",
         "VOICE_ERROR",
         "VOICE_ENABLED_CHANGED",
+        "VOICE_INPUT_ENABLED_CHANGED",
         "WAKE_WORD_DETECTED",
     }
 )

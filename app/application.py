@@ -570,6 +570,7 @@ class ApplicationManager:
                 self._mark_first_run_complete()
 
         voice_cfg = self._config.get("voice", {})
+        voice_input_enabled = voice_cfg.get("input_enabled", voice_cfg.get("enabled", True))
         audio_cfg = self._config.get("audio", {})
         stt_cfg = voice_cfg.get("stt", {})
         tts_cfg = voice_cfg.get("tts", {})
@@ -591,7 +592,7 @@ class ApplicationManager:
             event_bus=self._event_bus,
             audio_manager=create_audio(
                 config=audio_config,
-                preferred="sounddevice" if voice_cfg.get("enabled", True) else "stub",
+                preferred="sounddevice" if voice_input_enabled else "stub",
             ),
             stt=create_stt(
                 preferred="whisper" if stt_cfg.get("provider", "faster-whisper") == "faster-whisper" else "stub",
@@ -609,7 +610,7 @@ class ApplicationManager:
             self._voice.tts_name,
             self._voice.audio_name,
         )
-        if voice_cfg.get("enabled", True):
+        if voice_input_enabled:
             # Wake word respects the voice.wake_word.enabled sub-setting
             wake_cfg = voice_cfg.get("wake_word", {})
             if isinstance(wake_cfg, dict) and wake_cfg.get("enabled", True):

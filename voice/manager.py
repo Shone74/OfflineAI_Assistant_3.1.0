@@ -223,7 +223,9 @@ class VoiceManager:
         if self._config is not None and tts is None:
             self._apply_tts_config(self._read_tts_config_from_config())
         self._subscribe_to_config()
-        self._voice_enabled_sub_id = self._event_bus.subscribe("VOICE_ENABLED_CHANGED", self._on_voice_enabled_changed)
+        self._voice_enabled_sub_id = self._event_bus.subscribe(
+            "VOICE_INPUT_ENABLED_CHANGED", self._on_voice_enabled_changed
+        )
 
     def _subscribe_to_config(self) -> None:
         """Subscribe to CONFIG_CHANGED events for audio reconfiguration."""
@@ -270,12 +272,12 @@ class VoiceManager:
         self._unsubscribe_from_voice_enabled()
 
     def _unsubscribe_from_voice_enabled(self) -> None:
-        """Remove the VOICE_ENABLED_CHANGED subscription (idempotent)."""
+        """Remove the voice-input enable subscription (idempotent)."""
         if self._voice_enabled_sub_id is not None:
             try:
-                self._event_bus.unsubscribe("VOICE_ENABLED_CHANGED", self._voice_enabled_sub_id)
+                self._event_bus.unsubscribe("VOICE_INPUT_ENABLED_CHANGED", self._voice_enabled_sub_id)
             except Exception:
-                logger.debug("VOICE_ENABLED_CHANGED unsubscribe failed", exc_info=True)
+                logger.debug("VOICE_INPUT_ENABLED_CHANGED unsubscribe failed", exc_info=True)
             self._voice_enabled_sub_id = None
 
     @property
@@ -320,12 +322,11 @@ class VoiceManager:
         elif key == "voice.language":
             logger.debug("VoiceManager: CONFIG_CHANGED for voice.language — updating STT language")
             self._update_stt_language()
-        elif key == "voice.enabled":
+        elif key in ("voice.enabled", "voice.input_enabled", "voice.output_enabled"):
             enabled = data.get("value", True)
-            logger.debug("VoiceManager: CONFIG_CHANGED for voice.enabled — enabled=%s", enabled)
-            self._event_bus.publish(
-                "VOICE_ENABLED_CHANGED", {"enabled": enabled}
-            )
+            if key in ("voice.enabled", "voice.input_enabled"):
+                logger.debug("VoiceManager: CONFIG_CHANGED for %s — enabled=%s", key, enabled)
+                self._event_bus.publish("VOICE_INPUT_ENABLED_CHANGED", {"enabled": enabled})
 
     def _on_voice_enabled_changed(self, event_type: str, data: dict[str, Any]) -> None:
         """React to runtime VOICE_ENABLED_CHANGED — start/stop wake-word detection."""
@@ -780,6 +781,10 @@ class VoiceManager:
         """
         if self._state != VoiceState.IDLE:
             return False
+        if self._config is not None and not self._config.get(
+            "voice.input_enabled", self._config.get("voice.enabled", True)
+        ):
+            return False
         self.stop_wake_word()
         if not self._audio.is_available():
             self._publish_voice_error("microphone unavailable")
@@ -1027,6 +1032,10 @@ class VoiceManager:
         to finish on its own — ``QThread.terminate()`` is never called because
         it is unsafe when the worker is executing Python code.
         """
+        if self._config is not None and not self._config.get(
+            "voice.output_enabled", self._config.get("voice.enabled", True)
+        ):
+            return
         if self._state not in (VoiceState.IDLE, VoiceState.SPEAKING):
             logger.debug("speak() rejected — state=%s (not IDLE or SPEAKING)", self._state.value)
             return

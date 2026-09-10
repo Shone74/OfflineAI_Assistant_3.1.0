@@ -833,7 +833,9 @@ class MainWindow(QMainWindow):
             # delivers the final response as a complete string via this event.
             # When tokens already streamed a bubble, skip to avoid duplicates.
             self._chat.add_message("assistant", text)
-        if text.strip() and self._voice is not None and self._config.get("voice.enabled", True):
+        if text.strip() and self._voice is not None and self._config.get(
+            "voice.output_enabled", self._config.get("voice.enabled", True)
+        ):
             self._voice.speak(text)
         self._current_response = ""
         self._tokens_streamed = False
