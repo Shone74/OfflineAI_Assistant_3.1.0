@@ -248,7 +248,7 @@ class ChatWidget(QWidget):
         # set_vision_available). Files opens the attach dialog.
         self._btn_files = QPushButton("📎 Files")
         self._btn_files.setObjectName("capability_button")
-        self._btn_files.setToolTip("Attach a text file to the message")
+        self._btn_files.setToolTip("Attach a text or image file to the message")
         self._btn_files.clicked.connect(self._on_files_clicked)
         self._btn_vision = QPushButton("🖼 Vision")
         self._btn_vision.setObjectName("capability_button")
@@ -500,17 +500,45 @@ class ChatWidget(QWidget):
             self._on_send_clicked()
 
     def _on_files_clicked(self) -> None:
-        """Attach a text file — its contents are appended to the input."""
+        """Attach a text file or route an image through the vision pipeline."""
         from PySide6.QtWidgets import QFileDialog
 
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Attach Text File",
             "",
-            "Text Files (*.txt);;Markdown (*.md);;Python (*.py);;All Files (*)",
+            "Text and Images (*.txt *.md *.py *.png *.jpg *.jpeg *.bmp *.gif *.webp);;"
+            "Text Files (*.txt *.md *.py);;Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp);;"
+            "All Files (*)",
         )
         if not path:
             return
+
+        image_suffixes = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}
+        if Path(path).suffix.lower() in image_suffixes:
+            from PySide6.QtWidgets import QMessageBox
+
+            if not self._btn_vision.isEnabled():
+                QMessageBox.warning(
+                    self,
+                    "Vision unavailable",
+                    "Load a vision-capable model before attaching an image.",
+                )
+                return
+            try:
+                data = Path(path).read_bytes()
+            except OSError as exc:
+                QMessageBox.warning(self, "Attach File", f"Could not read image:\n{exc}")
+                return
+            if len(data) > 12 * 1024 * 1024:
+                QMessageBox.warning(self, "Vision", "Image too large (>12 MB), skipped.")
+                return
+            mime_type = mimetypes.guess_type(path)[0] or "image/png"
+            encoded = base64.b64encode(data).decode("ascii")
+            self._pending_images.append(f"data:{mime_type};base64,{encoded}")
+            self._btn_vision.setText(f"🖼 Vision ({len(self._pending_images)})")
+            return
+
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
