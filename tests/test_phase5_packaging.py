@@ -196,6 +196,9 @@ class TestFrozenStartup:
         import ai.models.gpu_runtime as rt
 
         monkeypatch.setattr(rt, "_extra_dll_dirs", [])
+        # Environment isolation: real nvidia wheels in site-packages must
+        # not leak into the frozen-bundle assertion.
+        monkeypatch.setattr(rt, "_candidate_nvidia_roots", lambda: [])
         monkeypatch.setattr(sys, "frozen", True, raising=False)
         monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
         import run as run_mod

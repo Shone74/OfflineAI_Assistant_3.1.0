@@ -1039,7 +1039,7 @@ def infer_capabilities(name: str, architecture: str = "", model_family: str = ""
 _KNOWN_LLM_ARCHITECTURES = frozenset({
     "llama", "llama2", "mllama",
     "phi2", "phi3", "phi3d1",
-    "qwen", "qwen2", "qwen2vl", "qwen2moe", "qwen3", "qwen3moe",
+    "qwen", "qwen2", "qwen2vl", "qwen2moe", "qwen3", "qwen3moe", "qwen35",
     "gemma", "gemma2", "gemma3", "gemma4",
     "gpt2", "gptj", "gptneox",
     "mpt", "mptd",

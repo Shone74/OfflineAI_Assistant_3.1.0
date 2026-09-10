@@ -237,7 +237,11 @@ class ModelsPage(QWidget):
                 set_models_root(root)
             except (ValueError, OSError) as exc:
                 logger.warning("Models root change not persisted: %s", exc)
-            self._model_manager.set_models_dir(root / "llm")
+            set_models_root = getattr(self._model_manager, "set_models_root", None)
+            if set_models_root is not None:
+                set_models_root(root)
+            else:
+                self._model_manager.set_models_dir(root / "llm")
             self._on_refresh()
             if self._assistant is not None and hasattr(self._assistant, "_engine"):
                 engine = self._assistant._engine
@@ -255,7 +259,7 @@ class ModelsPage(QWidget):
                 except Exception as exc:
                     logger.debug("Could not publish models root change: %s", exc)
             self._details.setText(
-                f"<b>Models Folder:</b> {root / 'llm'}<br>"
+                f"<b>Models Folder:</b> {root}<br>"
                 f"<b>Discovered:</b> {len(self._models)} model(s)"
             )
 

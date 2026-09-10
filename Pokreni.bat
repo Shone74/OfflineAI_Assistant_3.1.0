@@ -1,26 +1,28 @@
 @echo off
-rem Offline AI Assistant — launcher (portable Python 3.11 resolution)
-rem Priority: project .venv -> py -3.11 launcher -> hardcoded path -> fail with guidance.
+rem Offline AI Assistant launcher (Python 3.11)
 setlocal
-rem 1) Prefer project .venv if it exists
-if exist "%~dp0.venv\Scripts\python.exe" (
-    set PYTHON_EXE=%~dp0.venv\Scripts\python.exe
-) else (
-    rem 2) Use py launcher to locate Python 3.11 (works on Windows with py launcher)
-    py -3.11 -c "import sys; exit(0)" >nul 2>&1
-    if not errorlevel 1 (
-        set PYTHON_EXE=py -3.11
-    ) else (
-        rem 3) Fallback: explicit verified path (machine-specific)
-        set PY311=C:\Users\Bota\AppData\Local\Programs\Python\Python311\python.exe
-        if exist "%PY311%" (
-            set PYTHON_EXE=%PY311%
-        ) else (
-            echo [GRESKA] Python 3.11 nije pronadjen (ni .venv, ni 'py -3.11', ni hardkodiran put).
-            pause
-            exit /b 1
-        )
-    )
 cd /d "%~dp0"
-"%PYTHON_EXE%" run.py %*
-endlocal
+
+if exist ".venv\Scripts\python.exe" goto use_venv
+
+py -3.11 -V >nul 2>&1
+if not errorlevel 1 goto use_py_launcher
+
+set "PY311=C:\Users\Bota\AppData\Local\Programs\Python\Python311\python.exe"
+if exist "%PY311%" goto use_python_path
+
+echo [ERROR] Python 3.11 was not found.
+pause
+exit /b 1
+
+:use_venv
+".venv\Scripts\python.exe" run.py %*
+exit /b %errorlevel%
+
+:use_py_launcher
+py -3.11 run.py %*
+exit /b %errorlevel%
+
+:use_python_path
+"%PY311%" run.py %*
+exit /b %errorlevel%

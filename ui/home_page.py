@@ -100,15 +100,42 @@ class HomePage(QWidget):
         assistant_name: str = "Assistant",
         navigator=None,
         assistant=None,
+        event_bus=None,
     ) -> None:
         super().__init__()
         self._theme = theme
         self._assistant_name = assistant_name
         self._navigator = navigator
         self._assistant = assistant
+        self._event_bus = event_bus
+        self._event_sub_ids = []
 
         self._build_ui()
         self._refresh_status()
+        self._subscribe_events()
+
+    def _subscribe_events(self) -> None:
+        if self._event_bus is None:
+            return
+        for event_type in ("MODEL_LOADED", "MODEL_UNLOADED", "MODEL_LOAD_FAILED"):
+            try:
+                sub_id = self._event_bus.subscribe(event_type, self._on_model_event)
+                self._event_sub_ids.append((event_type, sub_id))
+            except Exception:
+                pass
+
+    def _on_model_event(self, event_type: str, data: dict) -> None:
+        self._refresh_status()
+
+    def _unsubscribe_events(self) -> None:
+        if self._event_bus is None:
+            return
+        for event_type, sub_id in self._event_sub_ids:
+            try:
+                self._event_bus.unsubscribe(event_type, sub_id)
+            except Exception:
+                pass
+        self._event_sub_ids.clear()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -227,3 +254,7 @@ class HomePage(QWidget):
             self._hero.set_status(model_ready)
         except Exception:
             pass
+
+    def closeEvent(self, event) -> None:
+        self._unsubscribe_events()
+        super().closeEvent(event)

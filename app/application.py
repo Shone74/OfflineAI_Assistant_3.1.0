@@ -62,6 +62,14 @@ from voice.tts import create_tts
 logger = get_logger("app")
 
 
+def _resolve_persist_dir(value: str | None) -> Path:
+    """Resolve persistence directories independently of the process CWD."""
+    if not value:
+        return DATA_DIR
+    path = Path(value)
+    return path if path.is_absolute() else user_data_root() / path
+
+
 def _has_display() -> bool:
     """Check if a display is available for Qt GUI."""
     import os
@@ -261,10 +269,24 @@ class ApplicationManager:
         # configured search paths (absolute only) are honoured as-is.
         models_root = get_models_root()
         llm_category_dir = get_model_category_dir("llm")
-        models_dir = self._config.get("ai.models_dir")
-        if not models_dir or not Path(models_dir).is_absolute():
-            models_dir = str(llm_category_dir)
-        search_paths = self._config.get("ai.model_search_paths", [str(llm_category_dir)])
+        # The canonical storage root is authoritative.  The legacy
+        # ai.models_dir key is retained only as a fallback for old settings.
+        models_dir = str(llm_category_dir)
+        configured_models_dir = self._config.get("ai.models_dir")
+        if not self._config.get("models.storage_root") and configured_models_dir:
+            legacy_path = Path(configured_models_dir)
+            if legacy_path.is_absolute():
+                models_dir = str(legacy_path)
+
+        configured_search_paths = self._config.get("ai.model_search_paths", [])
+        # Scan both the canonical category and the selected root itself. This
+        # supports roots containing models directly as well as the preferred
+        # category layout.
+        search_paths = [str(llm_category_dir), str(models_root)]
+        for search_path in configured_search_paths or []:
+            path = Path(search_path)
+            if path.is_absolute() and str(path) not in search_paths:
+                search_paths.append(str(path))
         ollama_dir = self._config.get("ai.ollama_models_dir", "")
         ollama_models_dir = Path(ollama_dir) if ollama_dir else None
         n_threads = self._config.get("ai.n_threads", 4)
@@ -337,7 +359,9 @@ class ApplicationManager:
 
         # Load persisted knowledge metadata before indexing
         knowledge_file = self._config.get("knowledge.file", "knowledge.json")
-        knowledge_dir = Path(self._config.get("knowledge.persist_dir", str(DATA_DIR)))
+        knowledge_dir = _resolve_persist_dir(
+            self._config.get("knowledge.persist_dir", str(DATA_DIR))
+        )
         knowledge_path = knowledge_dir / knowledge_file
         loaded_count = 0
         if knowledge_path.exists():
@@ -430,7 +454,9 @@ class ApplicationManager:
 
             workflow_file = self._config.get("automation.file", "workflows.json")
             tasks_file = self._config.get("automation.tasks_file", "tasks.json")
-            persist_dir = Path(self._config.get("automation.persist_dir", str(DATA_DIR)))
+            persist_dir = _resolve_persist_dir(
+                self._config.get("automation.persist_dir", str(DATA_DIR))
+            )
             workflow_path = persist_dir / workflow_file
             tasks_path = persist_dir / tasks_file
             try:
@@ -591,17 +617,18 @@ class ApplicationManager:
             else:
                 logger.info("Wake word disabled via voice.wake_word.enabled — not starting")
 
-        self._window = MainWindow(
-            config=self._config,
-            event_bus=self._event_bus,
-            theme=self._theme,
-            assistant=self._assistant,
-            security=self._security,
-            voice=self._voice,
-            plugin_manager=self._plugin_manager,
-            automation_manager=self._automation,
-            automation_dispatcher=getattr(self, "_automation_dispatcher", None),
-        )
+        if show_main_window:
+            self._window = MainWindow(
+                config=self._config,
+                event_bus=self._event_bus,
+                theme=self._theme,
+                assistant=self._assistant,
+                security=self._security,
+                voice=self._voice,
+                plugin_manager=self._plugin_manager,
+                automation_manager=self._automation,
+                automation_dispatcher=getattr(self, "_automation_dispatcher", None),
+            )
         self._voice.flush_pending_startup_errors()
         if show_main_window:
             self._window.show()
@@ -659,7 +686,9 @@ class ApplicationManager:
         if self._knowledge is not None and self._config is not None:
             try:
                 knowledge_file = self._config.get("knowledge.file", "knowledge.json")
-                knowledge_dir = Path(self._config.get("knowledge.persist_dir", str(DATA_DIR)))
+                knowledge_dir = _resolve_persist_dir(
+                    self._config.get("knowledge.persist_dir", str(DATA_DIR))
+                )
                 knowledge_path = knowledge_dir / knowledge_file
                 self._knowledge.save_file(knowledge_path)
                 logger.info("Knowledge persisted to %s", knowledge_path)
@@ -683,7 +712,9 @@ class ApplicationManager:
             try:
                 workflow_file = self._config.get("automation.file", "workflows.json")
                 tasks_file = self._config.get("automation.tasks_file", "tasks.json")
-                persist_dir = Path(self._config.get("automation.persist_dir", str(DATA_DIR)))
+                persist_dir = _resolve_persist_dir(
+                    self._config.get("automation.persist_dir", str(DATA_DIR))
+                )
                 workflow_path = persist_dir / workflow_file
                 tasks_path = persist_dir / tasks_file
                 self._automation.save_file(workflow_path)

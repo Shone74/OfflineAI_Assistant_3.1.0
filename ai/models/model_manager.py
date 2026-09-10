@@ -153,6 +153,16 @@ class ModelManager:
         self._search_paths = [models_dir]
         self._scan()
 
+    def set_models_root(self, root: Path) -> None:
+        """Scan a selected model root and its canonical ``llm`` category."""
+        root = root.resolve()
+        llm_dir = root / "llm"
+        self.models_dir = llm_dir
+        self._search_paths = [llm_dir, root] if root != llm_dir else [llm_dir]
+        if (root / "blobs").is_dir() and (root / "manifests").is_dir():
+            self._ollama_models_dir = root
+        self._scan()
+
     def set_search_paths(self, search_paths: list[Path]) -> None:
         """Set the list of directories to scan for local GGUF files."""
         self._search_paths = list(search_paths)

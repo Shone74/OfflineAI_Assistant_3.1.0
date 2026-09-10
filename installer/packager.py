@@ -134,6 +134,10 @@ PRODUCTION_DATAS: list[tuple[str, str]] = [
 #: Optional runtime backends — bundled only when installed in the build
 #: environment (find_spec at spec-generation time).  Absent backends keep
 #: the application's existing graceful degradation (stub/TEST_MODE paths).
+#: openwakeword/onnxruntime (wake word), croniter (scheduler), and the
+#: document loaders are included because they are lazily imported behind
+#: find_spec/try-except guards — exactly the class of import the Phase 10
+#: sounddevice incident showed can silently drop from the bundle.
 OPTIONAL_RUNTIME_PACKAGES: list[str] = [
     "llama_cpp",
     "faster_whisper",
@@ -141,6 +145,14 @@ OPTIONAL_RUNTIME_PACKAGES: list[str] = [
     "scipy",
     "pyttsx3",
     "pynvml",
+    "openwakeword",
+    "onnxruntime",
+    "croniter",
+    "pypdf",
+    "fitz",
+    "docx",
+    "docx2txt",
+    "bs4",
 ]
 
 #: Always-required hidden imports not discoverable by static analysis.
@@ -241,6 +253,18 @@ def build_pyinstaller_spec(spec: PackageSpec) -> str:
     ]
     hidden = list(REQUIRED_HIDDEN_IMPORTS) + _optional_hidden_imports()
 
+    # llama_cpp is a pure-Python ctypes wrapper that loads its native
+    # DLLs from llama_cpp/lib at runtime — PyInstaller has NO hook for
+    # it, so hiddenimports alone bundles the Python files but silently
+    # drops the DLLs (the app then reports "llama-cpp-python is not
+    # installed" in the frozen build).  When llama_cpp is present in the
+    # build environment, emit collect_all() so the lib/ DLLs land in
+    # _internal/llama_cpp/lib/ exactly where _ggml.py resolves them.
+    emit_llama_collect = importlib.util.find_spec("llama_cpp") is not None
+    if emit_llama_collect:
+        print("[packager] llama_cpp present — collecting native lib/ DLLs "
+              "into the bundle")
+
     lines: list[str] = [
         "# -*- mode: python ; coding: utf-8 -*-",
         (
@@ -254,18 +278,38 @@ def build_pyinstaller_spec(spec: PackageSpec) -> str:
         "",
         "block_cipher = None",
         "",
-        "a = Analysis(",
-        f"    ['{_quote(spec.entry_point)}'],",
-        "    pathex=['.'],",
-        "    binaries=[],",
-        "    datas=[",
     ]
+    if emit_llama_collect:
+        lines.extend([
+            "from PyInstaller.utils.hooks import collect_all",
+            "",
+            "# llama_cpp native DLLs (llama.dll, ggml*.dll, mtmd.dll...) —",
+            "# loaded via ctypes from llama_cpp/lib; there is no",
+            "# PyInstaller hook, so collect them explicitly.",
+            "llama_datas, llama_binaries, llama_hidden = collect_all('llama_cpp')",
+            "",
+            "a = Analysis(",
+            f"    ['{_quote(spec.entry_point)}'],",
+            "    pathex=['.'],",
+            "    binaries=list(llama_binaries),",
+            "    datas=list(llama_datas) + [",
+        ])
+    else:
+        lines.extend([
+            "a = Analysis(",
+            f"    ['{_quote(spec.entry_point)}'],",
+            "    pathex=['.'],",
+            "    binaries=[],",
+            "    datas=[",
+        ])
     for src, dst in datas:
         lines.append(f"        ('{_quote(src)}', '{_quote(dst)}'),")
     lines.extend([
         "    ],",
         "    hiddenimports=[",
     ])
+    if emit_llama_collect:
+        lines.append("        *llama_hidden,")
     for name in hidden:
         lines.append(f"        '{_quote(name)}',")
     lines.extend([

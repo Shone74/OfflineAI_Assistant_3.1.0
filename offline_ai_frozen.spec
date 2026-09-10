@@ -15,6 +15,7 @@ a = Analysis(
         'win32com',
         'win32timezone',
         'sounddevice',
+        'bs4',
     ],
     hookspath=[],
     hooksconfig={},

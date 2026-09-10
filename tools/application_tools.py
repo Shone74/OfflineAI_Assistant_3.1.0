@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from typing import Any, ClassVar
 
 from core.logger import get_logger
@@ -84,6 +85,31 @@ class ApplicationLauncherTool(Tool):
             )
 
         target = _KNOWN_APPS.get(program.lower(), program)
+
+        # Never launch ourselves: a bare "OfflineAI" resolves to this
+        # app's own executable directory via CreateProcess search order,
+        # which previously allowed a self-relaunch chain (each elevated
+        # child spawning the next).  Refuse any target that resolves to
+        # this process or its executable name.
+        own_names = {"offlineai", "offlineai.exe", "run", "run.py"}
+        target_basename = (
+            target.replace("/", "\\").rstrip("\\").split("\\")[-1].lower()
+            if target
+            else ""
+        )
+        own_exe = os.path.splitext(os.path.basename(sys.executable))[0].lower()
+        if (
+            program.lower() in own_names
+            or target_basename in own_names
+            or target_basename == own_exe
+            or (os.path.isabs(target) and os.path.exists(target)
+                and os.path.samefile(target, sys.executable))
+        ):
+            return ToolResult(
+                success=False,
+                message="Refusing to launch the assistant itself",
+                error="SelfLaunchRefused",
+            )
 
         try:
             if target.endswith(".exe") or "\\" in target or "/" in target:

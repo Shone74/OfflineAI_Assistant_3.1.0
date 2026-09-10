@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 PROJECT_LLM_DIR = Path(__file__).resolve().parents[1] / "models" / "llm"
+MODELS_PRESENT = any(PROJECT_LLM_DIR.glob("*.gguf"))
 
 
 def _llama_available() -> bool:
@@ -27,6 +28,7 @@ def _llama_available() -> bool:
 
 
 class TestModelIntegration:
+    @pytest.mark.skipif(not MODELS_PRESENT, reason="project GGUF models are not installed")
     def test_project_models_discovered(self):
         from ai.models.discovery import discover_all_models
         from ai.models.model_loader import ModelType
@@ -41,6 +43,7 @@ class TestModelIntegration:
         assert any("Phi-4-mini" in n for n in names)
         assert all(m.model_type in (ModelType.LLM,) for m in models)
 
+    @pytest.mark.skipif(not MODELS_PRESENT, reason="project GGUF models are not installed")
     def test_qwen_capabilities_for_agents(self):
         """Qwen2.5-Coder must have tool_calling (the agent system uses it)."""
         from ai.models.discovery import discover_all_models

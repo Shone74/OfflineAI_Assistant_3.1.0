@@ -280,10 +280,13 @@ class TestNvmlSafety:
     def _detect(self, monkeypatch, fake, llama_offload):
         import ai.models.gpu_runtime as rt
 
-        monkeypatch.setattr(
-            sys, "modules",
-            {**sys.modules, "pynvml": fake},
-        )
+        # NOTE: in-place setitem on the REAL sys.modules dict — replacing
+        # sys.modules wholesale does not affect the ``import pynvml``
+        # statement inside _read_vram_via_nvml when a real pynvml was
+        # already imported by an earlier test module (the C-import fast
+        # path bypasses the replaced dict).  setitem patches the actual
+        # mapping the import system consults.
+        monkeypatch.setitem(sys.modules, "pynvml", fake)
         monkeypatch.setattr(
             rt, "_llama_supports_offload", lambda: llama_offload
         )
@@ -332,11 +335,16 @@ class TestNvmlSafety:
         assert fake.init_calls == 0
 
     def test_llama_cpp_missing_is_cpu(self, monkeypatch):
+        """Backend reports no offload → capability must be CPU-only,
+        regardless of whether a real llama_cpp exists in this env (the
+        full-suite run may have it imported from a prior test module)."""
         import ai.models.gpu_runtime as rt
 
         monkeypatch.setattr(rt, "_capabilities_cache", None, raising=False)
         monkeypatch.setattr(rt, "apply_cuda_dll_discovery", list)
-        # No llama_cpp in this environment (real) → offload unsupported.
+        monkeypatch.setattr(
+            rt, "_llama_supports_offload", lambda: False
+        )
         caps = rt.detect_gpu_capabilities(refresh=True)
         assert caps.offload_supported is False
 
@@ -365,6 +373,10 @@ class TestCudaDllDiscovery:
         import ai.models.gpu_runtime as rt
 
         monkeypatch.setattr(rt, "_extra_dll_dirs", [])
+        # Environment isolation: a dev env WITH nvidia wheels installed
+        # would otherwise contribute real site-packages dirs and break
+        # the empty-result expectation.
+        monkeypatch.setattr(rt, "_candidate_nvidia_roots", lambda: [])
         assert register_cuda_dll_dir("relative_cuda") is None
         assert rt.discover_cuda_dll_dirs() == []
 
@@ -372,6 +384,7 @@ class TestCudaDllDiscovery:
         import ai.models.gpu_runtime as rt
 
         monkeypatch.setattr(rt, "_extra_dll_dirs", [])
+        monkeypatch.setattr(rt, "_candidate_nvidia_roots", lambda: [])
         missing = tmp_path / "no_such_dir"
         assert register_cuda_dll_dir(missing) is None
 

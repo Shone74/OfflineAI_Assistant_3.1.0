@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QFileDialog, QWidget
 
 from app.application import ApplicationManager
 from ui.agents_page import AgentsPage
@@ -118,11 +118,35 @@ def _wire_knowledge_dashboard(knowledge: KnowledgeDashboard, assistant) -> None:
         knowledge.set_statistics(kb.get_statistics())
         knowledge.set_documents(kb._documents)
 
+    def _on_export() -> None:
+        kb = getattr(assistant, "knowledge", None)
+        if kb is None:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            knowledge,
+            "Export Knowledge Base",
+            "knowledge_export.json",
+            "JSON Files (*.json);;Markdown Files (*.md)",
+        )
+        if not path:
+            return
+        if path.lower().endswith(".md"):
+            content = kb.export_to_markdown()
+        else:
+            import json
+            content = json.dumps(kb.export_to_dict(), ensure_ascii=False, indent=2)
+        try:
+            with open(path, "w", encoding="utf-8") as export_file:
+                export_file.write(content)
+        except OSError:
+            return
+
     knowledge.search_requested.connect(_on_search)
     knowledge.index_requested.connect(_on_index)
     knowledge.index_file_requested.connect(_on_index_file)
     knowledge.rebuild_requested.connect(_on_rebuild)
     knowledge.delete_requested.connect(_on_delete)
+    knowledge.export_requested.connect(_on_export)
     # Seed the dashboard with the current knowledge base state.
     kb = getattr(assistant, "knowledge", None)
     if kb is not None:
@@ -217,6 +241,7 @@ def main() -> int:
             assistant_name=assistant_name,
             navigator=navigator,
             assistant=assistant,
+            event_bus=manager._event_bus,
         )
         hub = AssistantHub(assistant=assistant, navigator=navigator)
 

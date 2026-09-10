@@ -10,11 +10,24 @@ and to rotating log files in ``logs/``:
 from __future__ import annotations
 
 import logging
+import time
 from logging.handlers import TimedRotatingFileHandler
 
 from core.paths import LOGS_DIR
 
 _LOGS_DIR_INITIALIZED = False
+
+
+class _ResilientTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """Keep logging usable when another process temporarily owns a rollover file."""
+
+    def doRollover(self) -> None:
+        try:
+            super().doRollover()
+        except OSError:
+            # Windows can deny the rename when another instance is rotating
+            # the same file. Defer rotation and keep the active log writable.
+            self.rolloverAt = int(time.time()) + 86400
 
 
 def _ensure_logs_dir() -> None:
@@ -48,7 +61,7 @@ def get_logger(name: str = "offlineai") -> logging.Logger:
     console.setFormatter(formatter)
     logger.addHandler(console)
 
-    main_handler = TimedRotatingFileHandler(
+    main_handler = _ResilientTimedRotatingFileHandler(
         LOGS_DIR / "assistant.log",
         when="midnight",
         backupCount=7,
@@ -58,7 +71,7 @@ def get_logger(name: str = "offlineai") -> logging.Logger:
     main_handler.setFormatter(formatter)
     logger.addHandler(main_handler)
 
-    error_handler = TimedRotatingFileHandler(
+    error_handler = _ResilientTimedRotatingFileHandler(
         LOGS_DIR / "errors.log",
         when="midnight",
         backupCount=7,

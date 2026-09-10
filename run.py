@@ -153,6 +153,48 @@ def _frozen_smoke_test() -> int:
     return 0
 
 
+def _acquire_single_instance_lock() -> bool:
+    """Prevent multiple app instances (and self-relaunch chains).
+
+    Uses a named Windows mutex held for the lifetime of the process.  A
+    second launch (user double-click, installer postinstall run, or a
+    tool accidentally resolving to this executable) exits immediately
+    instead of stacking instances — the elevated-install respawn loop
+    that produced hundreds of zombie OfflineAI.exe processes came from
+    exactly this missing guard.  TEST_MODE keeps the old behaviour for
+    parallel test runs.
+    """
+    if os.environ.get("OFFLINE_AI_TEST_MODE", "") == "1":
+        return True
+    import ctypes
+    import ctypes.wintypes
+
+    ERROR_ALREADY_EXISTS = 183
+    mutex_name = "Global\\OfflineAI_Assistant_SingleInstance_v1"
+    try:
+        handle = ctypes.windll.kernel32.CreateMutexW(
+            None, False, mutex_name
+        )
+        if not handle:
+            # Cannot create the mutex (unexpected) — allow the app to
+            # start rather than blocking the user entirely.
+            return True
+        if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+            print(
+                "[launcher] Another Offline AI Assistant instance is "
+                "already running — exiting.",
+                file=sys.stderr,
+            )
+            return False
+        # Keep the handle alive for the whole process; never close it
+        # (closing would release the lock and let the next launch race).
+        globals()["_SINGLE_INSTANCE_MUTEX"] = handle
+        return True
+    except Exception:
+        # Non-Windows or unexpected failure — never block startup.
+        return True
+
+
 def main() -> int:
     app_root = _app_root()
     _prepare_paths(app_root)
@@ -164,10 +206,20 @@ def main() -> int:
         if os.environ.get("OFFLINE_AI_SMOKE_TEST", "") == "1":
             return _frozen_smoke_test()
 
-    os.environ.setdefault("QT_QPA_PLATFORM", "windows")
+    if not _acquire_single_instance_lock():
+        return 0
+
+    if sys.platform == "win32":
+        os.environ.setdefault("QT_QPA_PLATFORM", "windows")
     from app.application_final import main as app_main
     return app_main()
 
 
 if __name__ == "__main__":
+    # Multiprocessing-safe entry for frozen Windows builds: child
+    # processes spawned by the bundled interpreter re-execute the
+    # bootloader here first.
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     sys.exit(main())

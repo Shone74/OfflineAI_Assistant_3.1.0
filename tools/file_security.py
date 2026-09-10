@@ -99,6 +99,11 @@ def _is_link(path: Path) -> bool:
     are the most common directory-escape vector on Windows (and can be
     created without elevated privileges).  The security policy must treat
     them as links.
+
+    Junction detection is version-robust: ``os.path.isjunction`` exists
+    only from Python 3.12; on older interpreters (the verified dev env is
+    3.11) the ``st_reparse_point`` stat attribute (Windows, 3.8+) is used
+    instead so a junction can never slip past the policy.
     """
     try:
         if path.is_symlink():
@@ -110,6 +115,16 @@ def _is_link(path: Path) -> bool:
         try:
             return isjunction(path)
         except OSError:
+            return False
+    # Python < 3.12 fallback: os.lstat on Windows exposes
+    # st_file_attributes (stat() would FOLLOW the junction and lose the
+    # reparse bit); the FILE_ATTRIBUTE_REPARSE_POINT (0x400) flag is set
+    # for junctions (and symlinks, already handled above).
+    if os.name == "nt":
+        try:
+            attrs = os.lstat(path).st_file_attributes
+            return bool(attrs & 0x400)  # FILE_ATTRIBUTE_REPARSE_POINT
+        except (OSError, AttributeError):
             return False
     return False
 
