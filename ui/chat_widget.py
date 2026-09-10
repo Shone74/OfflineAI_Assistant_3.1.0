@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import mimetypes
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -548,7 +549,9 @@ class ChatWidget(QWidget):
                     self, "Vision", f"Image too large (>12 MB), skipped:\n{p}"
                 )
                 continue
-            self._pending_images.append(base64.b64encode(data).decode("ascii"))
+            mime_type = mimetypes.guess_type(p)[0] or "image/png"
+            encoded = base64.b64encode(data).decode("ascii")
+            self._pending_images.append(f"data:{mime_type};base64,{encoded}")
             added += 1
         if added:
             self._btn_vision.setText(f"🖼 Vision ({len(self._pending_images)})")

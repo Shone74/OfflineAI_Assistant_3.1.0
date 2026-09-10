@@ -10,6 +10,7 @@ ship with Phase 3:
 from __future__ import annotations
 
 import os
+import base64
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -251,8 +252,9 @@ class LlamaCppEngine(LLMEngine):
                 "Install llama-cpp-python and load a GGUF model."
             )
         cfg = config or GenerationConfig()
+        vision_messages = _extract_vision_messages(messages)
         return self._loader.generate_chat(
-            messages,
+            vision_messages if vision_images_present(messages) else messages,
             max_tokens=cfg.max_tokens,
             temperature=cfg.temperature,
             top_p=cfg.top_p,
@@ -526,7 +528,10 @@ def _extract_vision_messages(
                 {"type": "text", "text": text or "Describe this image."}
             ]
             for img in images:
-                data = str(img)
+                if isinstance(img, bytes):
+                    data = base64.b64encode(img).decode("ascii")
+                else:
+                    data = str(img)
                 if data.startswith("data:"):
                     uri = data
                 else:
