@@ -177,6 +177,11 @@ class ModelsPage(QWidget):
         self._selected_model = next((m for m in self._models if m.name == model_name), None)
         if self._selected_model:
             self._details.setText(self._format_model_details(self._selected_model))
+            if self._event_bus is not None:
+                self._event_bus.publish(
+                    "MODEL_SELECTED",
+                    data={"model": self._selected_model.name},
+                )
 
     def _format_model_details(self, model: ModelInfo) -> str:
         source_display = model.source.display_name if model.source else "Unknown"

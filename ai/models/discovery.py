@@ -23,6 +23,7 @@ from typing import Any
 from ai.models.model_loader import (
     ModelInfo,
     ModelSource,
+    ModelType,
     _read_gguf_metadata,
     classify_model,
     infer_capabilities,
@@ -102,6 +103,47 @@ def _safe_stat(path: Path) -> int:
         return 0
 
 
+def _context_length_from_metadata(metadata: dict[str, Any]) -> int:
+    """Read the common GGUF context-length metadata keys."""
+    for key in (
+        "general.context_length",
+        "general.n_ctx_train",
+        "llama.context_length",
+        "qwen2.context_length",
+        "qwen3.context_length",
+    ):
+        value = metadata.get(key, 0)
+        try:
+            if int(value) > 0:
+                return int(value)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def _finalize_capabilities(
+    capabilities: Any,
+    model_type: ModelType,
+    context_length: int,
+) -> Any:
+    """Align inferred flags with the functional role of the discovered file."""
+    if model_type not in (ModelType.LLM, ModelType.VISION_LLM):
+        capabilities.text_generation = False
+        capabilities.streaming = False
+        capabilities.vision = False
+        capabilities.multimodal = False
+        capabilities.tool_calling = False
+        capabilities.function_calling = False
+        capabilities.structured_output = False
+        capabilities.json_output = False
+        capabilities.reasoning = False
+        capabilities.code_generation = False
+    if model_type == ModelType.EMBEDDING:
+        capabilities.embeddings = True
+    capabilities.long_context = context_length >= 32768
+    return capabilities
+
+
 def discover_local_gguf(directory: Path) -> list[ModelInfo]:
     """Discover ``.gguf`` files in *directory* (recursive).
 
@@ -139,19 +181,25 @@ def discover_local_gguf(directory: Path) -> list[ModelInfo]:
         architecture = ""
         if metadata:
             architecture = metadata.get("general.architecture", "")
+        context_length = _context_length_from_metadata(metadata or {})
+        model_type = classify_model(entry.stem, entry, architecture, metadata or {})
         info = ModelInfo(
             name=entry.stem,
             path=entry,
             size_bytes=size,
-            capabilities=infer_capabilities(entry.stem, architecture=architecture),
+            capabilities=_finalize_capabilities(infer_capabilities(
+                entry.stem,
+                architecture=architecture,
+                model_family=metadata.get("general.basename", "") if metadata else "",
+            ), model_type, context_length),
             source=ModelSource.LOCAL_GGUF,
             source_identifier=entry.stem,
             architecture=architecture,
             parameters=metadata.get("general.param_count", "") if metadata else "",
             quantization=metadata.get("general.file_type", "") if metadata else "",
-            context_length=0,
+            context_length=context_length,
             model_family=metadata.get("general.basename", "") if metadata else "",
-            model_type=classify_model(entry.stem, entry, architecture, metadata or {}),
+            model_type=model_type,
         )
         models.append(info)
         logger.debug("Discovered local GGUF: %s (%.1f MB)", entry.name, info.size_mb)
@@ -223,19 +271,25 @@ def discover_extensionless_gguf(
         architecture = ""
         if metadata:
             architecture = metadata.get("general.architecture", "")
+        context_length = _context_length_from_metadata(metadata or {})
+        model_type = classify_model(entry.stem, entry, architecture, metadata or {})
         info = ModelInfo(
             name=entry.stem,
             path=entry,
             size_bytes=size,
-            capabilities=infer_capabilities(entry.stem, architecture=architecture),
+            capabilities=_finalize_capabilities(infer_capabilities(
+                entry.stem,
+                architecture=architecture,
+                model_family=metadata.get("general.basename", "") if metadata else "",
+            ), model_type, context_length),
             source=ModelSource.EXTENSIONLESS,
             source_identifier=entry.stem,
             architecture=architecture,
             parameters=metadata.get("general.param_count", "") if metadata else "",
             quantization=metadata.get("general.file_type", "") if metadata else "",
-            context_length=0,
+            context_length=context_length,
             model_family=metadata.get("general.basename", "") if metadata else "",
-            model_type=classify_model(entry.stem, entry, architecture, metadata or {}),
+            model_type=model_type,
         )
         models.append(info)
         logger.debug("Discovered extensionless GGUF: %s (%.1f MB)", entry.name, info.size_mb)

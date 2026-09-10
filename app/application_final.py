@@ -181,7 +181,10 @@ def _build_pages(manager: ApplicationManager, navigator) -> list[tuple[str, QWid
     knowledge = KnowledgeDashboard(navigator=navigator, assistant=assistant)
     _wire_knowledge_dashboard(knowledge, assistant)
     models = ModelsPage(assistant=assistant, model_manager=manager._model_manager, event_bus=event_bus)
-    capabilities = CapabilitiesPage(assistant=assistant)
+    capabilities = CapabilitiesPage(
+        assistant=assistant,
+        model_manager=manager._model_manager,
+    )
     projects = ProjectsPage(assistant=assistant)
     agents = AgentsPage(assistant=assistant)
     tools = ToolsPage(assistant=assistant, event_bus=event_bus)
@@ -253,7 +256,8 @@ def main() -> int:
         try:
             caps = getattr(assistant, "model_capabilities", None)
             if caps:
-                capabilities = [c for c, active in caps._asdict().items() if active][:8]
+                capability_map = caps.to_dict() if hasattr(caps, "to_dict") else vars(caps)
+                capabilities = [c for c, active in capability_map.items() if active][:8]
         except Exception:
             pass
         memory_count = 0

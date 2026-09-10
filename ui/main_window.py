@@ -290,7 +290,10 @@ class MainWindow(QMainWindow):
         self._memory_page = MemoryPage(config=self._config, assistant=self._assistant)
         self._router.register("memory", self._memory_page)
 
-        self._capabilities_page = CapabilitiesPage(self._assistant)
+        self._capabilities_page = CapabilitiesPage(
+            assistant=self._assistant,
+            model_manager=getattr(self._assistant, "model_manager", None),
+        )
         self._router.register("capabilities", self._capabilities_page)
 
         self._projects_page = ProjectsPage(self._assistant)

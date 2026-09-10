@@ -48,9 +48,16 @@ _CAPABILITY_MAP: list[tuple[str, str, str]] = [
 class CapabilitiesPage(QWidget):
     """Display the assistant's technical and functional capabilities."""
 
-    def __init__(self, assistant: Any = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        assistant: Any = None,
+        model_manager: Any = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._assistant = assistant
+        self._model_manager = model_manager
+        self._selected_model_name: str | None = None
         self._model_name_label: QLabel | None = None
         self._model_status_label: QLabel | None = None
         self._no_model_label: QLabel | None = None
@@ -66,15 +73,17 @@ class CapabilitiesPage(QWidget):
         bus = getattr(self._assistant, "event_bus", None)
         if bus is None:
             return
-        for event_type in ("MODEL_LOADED", "MODEL_UNLOADED", "MODEL_LOAD_FAILED"):
+        for event_type in (
+            "MODEL_SELECTED",
+            "MODEL_LOADED",
+            "MODEL_UNLOADED",
+            "MODEL_LOAD_FAILED",
+        ):
             try:
                 sub_id = bus.subscribe(event_type, self._on_model_event)
                 self._event_sub_ids.append((event_type, sub_id))
             except Exception:
                 pass
-
-    def _on_model_event(self, event_type: str, data: dict) -> None:
-        self._refresh_capabilities()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -176,10 +185,25 @@ class CapabilitiesPage(QWidget):
         caps_dict: dict[str, bool] | None = None
         model_name = "N/A"
         status_text = "No model loaded"
+        selected_model = None
 
         if self._assistant is not None:
-            model_name = getattr(self._assistant, "model_name", "N/A")
-            caps_dict = getattr(self._assistant, "model_capabilities", None)
+            if self._model_manager is not None:
+                models = self._model_manager.list_models()
+                selected_name = self._selected_model_name
+                if selected_name:
+                    selected_model = next(
+                        (model for model in models if model.name == selected_name),
+                        None,
+                    )
+                if selected_model is None:
+                    selected_model = self._model_manager.get_active_model()
+                if selected_model is not None:
+                    model_name = selected_model.name
+                    caps_dict = selected_model.capabilities.to_dict()
+            if caps_dict is None and self._model_manager is None:
+                model_name = getattr(self._assistant, "model_name", "N/A")
+                caps_dict = getattr(self._assistant, "model_capabilities", None)
             engine = getattr(self._assistant, "_engine", None)
             if engine is not None:
                 load_status = getattr(engine, "load_status", "")
@@ -187,6 +211,17 @@ class CapabilitiesPage(QWidget):
                     status_text = "Model loaded and ready"
                 else:
                     status_text = f"Model status: {load_status}"
+
+            if selected_model is not None:
+                active = self._model_manager.get_active_model()
+                if active is None or active.name != selected_model.name:
+                    status_text = "Model discovered, not activated"
+                elif getattr(engine, "supports_vision", False):
+                    status_text = "Model loaded and ready (vision enabled)"
+
+        if selected_model is not None and getattr(selected_model, "context_length", 0):
+            context = selected_model.context_length
+            status_text = f"{status_text} · Context: {context:,} tokens"
 
         if self._model_name_label is not None:
             self._model_name_label.setText(f"Model: {model_name}")
@@ -199,7 +234,7 @@ class CapabilitiesPage(QWidget):
         if container_layout is not None:
             while container_layout.count():
                 item = container_layout.takeAt(0)
-                if item.widget():
+                if item.widget() and item.widget() is not self._no_model_label:
                     item.widget().setParent(None)
 
         if caps_dict is None:
@@ -222,4 +257,11 @@ class CapabilitiesPage(QWidget):
 
     def refresh(self) -> None:
         """Public refresh — call when the active model changes."""
+        self._refresh_capabilities()
+
+    def _on_model_event(self, event_type: str, data: dict) -> None:
+        if event_type == "MODEL_SELECTED":
+            self._selected_model_name = (data or {}).get("model")
+        elif event_type in ("MODEL_UNLOADED", "MODEL_LOAD_FAILED"):
+            self._selected_model_name = None
         self._refresh_capabilities()
